@@ -79,10 +79,18 @@ from older Next.js versions in a few places, e.g. `proxy.ts` instead of
   the only way the app queries it — ownership-scoped, with MongoDB as the
   source of truth for both chunk content and the vectors themselves (the
   index is rebuildable from MongoDB, never the other way around).
+- RAG & AI orchestration foundation (`src/lib/ai/`): `AIOrchestrator.ask()`
+  coordinates RetrievalService, a deliberately-scoped
+  `AcademicContextProvider`, a pure `ContextAssembler`, a `PromptBuilder`
+  that enforces the trust boundary between application data and untrusted
+  retrieved material, and an `LLMProvider` abstraction (Anthropic
+  implementation) — see `src/lib/ai/orchestrator.ts` for the full flow.
+  This is infrastructure only: no chat UI, quiz/flashcard generation, or
+  study planning yet.
 
 Not built yet (by design — this is the foundation those features depend on):
-RAG/AI-generated answers, AI-generated notes/flashcards/quizzes, an AI
-tutor, voice. Those come after this foundation is solid.
+the AI tutor chat UI, quiz/flashcard generation, AI-generated study plans,
+voice. Those come after this foundation is solid.
 
 ## Project structure
 
@@ -98,6 +106,11 @@ src/
                            # per-feature domain logic (pure functions + zod
                            # validation), unit-tested independently of Mongo/Next
     actions/               # Server Actions (ownership-checked mutations)
+    embeddings/, retrieval/ # local embedding provider + persistent HNSW
+                           # index + RetrievalService (see their own comments)
+    ai/                    # RAG/AI orchestration foundation: LLMProvider,
+                           # AcademicContextProvider, ContextAssembler,
+                           # PromptBuilder, AIOrchestrator
     storage/s3.ts          # S3-compatible object storage client
     auth.ts, dal.ts, db.ts # NextAuth config, session helpers, Mongoose connection
   models/                 # Mongoose schemas
