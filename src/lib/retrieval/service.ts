@@ -1,4 +1,5 @@
 import "server-only";
+import { Types } from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import { CURRENT_EMBEDDING_MODEL } from "@/lib/embeddings/constants";
 import { getEmbeddingProvider } from "@/lib/embeddings/provider";
@@ -125,6 +126,68 @@ async function resolveHits(userId: string, hits: VectorSearchHit[], topK: number
  * matches nothing, or a search with no hits above the score floor all
  * just return an empty array.
  */
+export interface MaterialCoverageOptions {
+  maxChunks?: number;
+  maxCharacters?: number;
+}
+
+/**
+ * Coverage retrieval for a single material, for generators (Study Notes,
+ * and later flashcards/quizzes) that need breadth across a document rather
+ * than the best matches to one semantic query — a Tutor question has a
+ * clear query to embed and rank against; "cover this material" doesn't.
+ * This is a plain ownership-scoped MongoDB query in the material's own
+ * chunkIndex order, bounded by chunk count and character budget — not a
+ * second vector-search system, and not an unbounded dump. It also doesn't
+ * depend on embedding having succeeded (unlike search()): chunks exist and
+ * carry their extracted text before embedding ever runs (see
+ * study-materials/processing.ts), so a material can be "covered" the
+ * moment it's "ready", regardless of embedding status.
+ */
+export async function getMaterialCoverage(
+  userId: string,
+  materialId: string,
+  options: MaterialCoverageOptions = {},
+): Promise<RetrievalHit[]> {
+  if (!Types.ObjectId.isValid(materialId)) return [];
+
+  await connectToDatabase();
+
+  const maxChunks = options.maxChunks ?? 12;
+  const maxCharacters = options.maxCharacters ?? 10000;
+
+  const chunks = await MaterialChunk.find({ materialId, userId }).sort({ chunkIndex: 1 }).lean();
+
+  const hits: RetrievalHit[] = [];
+  let totalChars = 0;
+  for (const chunk of chunks) {
+    if (hits.length >= maxChunks) break;
+    // Same "always keep at least one, never add a second past budget" rule
+    // ContextAssembler itself applies — see that file's comment.
+    if (hits.length > 0 && totalChars + chunk.text.length > maxCharacters) break;
+
+    hits.push({
+      chunk: toRetrievedChunk(chunk),
+      // Coverage hits aren't ranked by similarity — there's no query to
+      // score against — so every hit gets the same score. It's never
+      // shown to the user (see lib/study-resources' source handling) and
+      // exists only because RetrievalHit's shape requires one; document
+      // order (chunkIndex) is preserved by JS's stable sort in
+      // ContextAssembler.build() when every score ties.
+      score: 1,
+      source: {
+        materialId: chunk.materialId.toString(),
+        page: chunk.pageStart,
+        slide: chunk.slideStart,
+        heading: chunk.heading,
+      },
+    });
+    totalChars += chunk.text.length;
+  }
+
+  return hits;
+}
+
 export async function search(userId: string, queryText: string, options: SearchOptions = {}): Promise<RetrievalHit[]> {
   const trimmedQuery = queryText.trim();
   if (!trimmedQuery) return [];
