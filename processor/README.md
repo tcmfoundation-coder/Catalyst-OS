@@ -43,9 +43,30 @@ processor/
                     empty blocks/sections) into the canonical form
   chunking/        splits a NormalizedDocument into retrieval-sized chunks,
                     preserving heading/page/slide metadata
-  cli.py           the only thing Next.js calls — see its docstring
+  embedding/       local embedding model (fastembed, BAAI/bge-small-en-v1.5)
+                    behind an EmbeddingProvider seam — see its module
+                    docstring for the model choice and why
+  cli.py           the only thing Next.js calls for extraction — see its
+                    docstring
+  embed_cli.py     the only thing Next.js calls for embedding — same
+                    pure-function-wearing-a-CLI contract as cli.py
   tests/           pytest, with fixture PDFs/DOCX/PPTX generated on the fly
 ```
+
+## Embeddings
+
+`embed_cli.py` takes a JSON array of texts on stdin and returns one line of
+JSON: `{"ok": true, "model": "...", "dimension": 384, "embeddings": [[...]]}`.
+The model downloads once on first use and is cached under `processor/.cache`
+(gitignored) — set `EMBEDDING_MODEL_CACHE_DIR` to use a different location.
+
+```bash
+cd processor
+echo '["Some chunk text"]' | .venv/bin/python -m processor.embed_cli --mode documents
+```
+
+See `src/lib/retrieval/` in the main app for what consumes this (the
+persistent HNSW vector index and RetrievalService).
 
 ## Adding a new format
 

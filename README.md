@@ -72,9 +72,16 @@ from older Next.js versions in a few places, e.g. `proxy.ts` instead of
   URL), processed by the Python component in `processor/` into structured,
   ownership-scoped chunks (`StudyMaterial` + `MaterialChunk` models). See
   `processor/README.md` for the extraction/chunking pipeline itself.
+- Embeddings & semantic retrieval: each chunk is embedded locally (no
+  external API) via `processor/processor/embedding/` (fastembed,
+  BAAI/bge-small-en-v1.5) and indexed in a persistent HNSW vector index
+  (`src/lib/retrieval/`, `hnswlib-node`). `RetrievalService.search()` is
+  the only way the app queries it — ownership-scoped, with MongoDB as the
+  source of truth for both chunk content and the vectors themselves (the
+  index is rebuildable from MongoDB, never the other way around).
 
 Not built yet (by design — this is the foundation those features depend on):
-embeddings/vector search, RAG, AI-generated notes/flashcards/quizzes, an AI
+RAG/AI-generated answers, AI-generated notes/flashcards/quizzes, an AI
 tutor, voice. Those come after this foundation is solid.
 
 ## Project structure
