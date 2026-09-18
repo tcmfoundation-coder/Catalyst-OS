@@ -104,9 +104,30 @@ from older Next.js versions in a few places, e.g. `proxy.ts` instead of
   messageId) ownership server-side — a conversation ID from the browser is
   never trusted on its own.
 
+- Structured learning resources & AI Study Notes (`src/lib/ai/resource-generation.ts`,
+  `src/lib/study-resources/`, `/dashboard/study-notes`): a second AI-layer
+  entry point, `generateStructuredResource()`, sitting alongside
+  `ask()`/`askStructured()` in the RAG pipeline — for generators that need
+  breadth across a whole material rather than the best match to one
+  question. `RetrievalService.getMaterialCoverage()` returns a material's
+  own chunks in document order (bounded by count/character budget, no
+  vector search involved), and the generator refuses to call the LLM at
+  all when a material has no usable content — unlike Tutor, there's no
+  "general knowledge" fallback for a resource that's supposed to be
+  grounded in the user's own document. The first resource type, Study
+  Notes (title/overview/sections with key points, definitions, and
+  examples), is Zod-validated end to end with explicit size limits
+  (`lib/study-resources/notes-schema.ts`'s `NOTES_LIMITS`) so a model
+  response can never balloon into an unbounded MongoDB document. Real
+  sources are attached after generation from `ContextAssembler`'s own
+  output — the model has no field to fabricate a citation into. Generated
+  resources persist in one `StudyResource` model (discriminated by `type`,
+  "notes" today) so future resource types (flashcards, quizzes) can reuse
+  it without a schema migration.
+
 Not built yet (by design — this is the foundation those features depend on):
-streaming, quiz/flashcard generation, AI-generated study plans, voice.
-Those come after this foundation is solid.
+streaming, flashcards, quizzes, AI-generated study plans, voice, adaptive
+mastery, spaced repetition. Those come after this foundation is solid.
 
 ## Project structure
 
@@ -126,12 +147,19 @@ src/
                            # index + RetrievalService (see their own comments)
     ai/                    # RAG/AI orchestration foundation: LLMProvider,
                            # AcademicContextProvider, ContextAssembler,
-                           # PromptBuilder, AIOrchestrator
+                           # PromptBuilder, AIOrchestrator, and
+                           # resource-generation.ts (generateStructuredResource,
+                           # the material-coverage sibling of askStructured)
     tutor/                 # AI Tutor: the first feature built on lib/ai —
                            # tutor-specific request/response shape + teaching
                            # instructions, calls AIOrchestrator only; plus
                            # persisted conversation CRUD, history bounding
                            # policy, and title derivation
+    study-resources/       # Structured learning resources built on
+                           # generateStructuredResource() — Study Notes'
+                           # Zod schema + size-limit policy, role
+                           # instructions, generation service (ownership,
+                           # source attachment, persistence), and CRUD
     storage/s3.ts          # S3-compatible object storage client
     auth.ts, dal.ts, db.ts # NextAuth config, session helpers, Mongoose connection
   models/                 # Mongoose schemas
