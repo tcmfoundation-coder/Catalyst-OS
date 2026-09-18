@@ -24,6 +24,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             >
               Academics
             </Link>
+            <Link href="/dashboard/tasks" className="text-slate-600 hover:text-slate-900">
+              Tasks
+            </Link>
             {session?.user?.name && (
               <span className="hidden text-slate-400 sm:inline">{session.user.name}</span>
             )}

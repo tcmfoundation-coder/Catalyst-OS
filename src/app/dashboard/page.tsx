@@ -5,7 +5,10 @@ import { connectToDatabase } from "@/lib/db";
 import { AcademicYear } from "@/models/AcademicYear";
 import { Semester } from "@/models/Semester";
 import { Course } from "@/models/Course";
+import { Task, type ITask } from "@/models/Task";
 import { calculateCGPA, calculateSemesterGPA } from "@/lib/academic/gpa";
+import { compareTasks } from "@/lib/tasks/sort";
+import { UpcomingTasksWidget, type UpcomingTaskData } from "./upcoming-tasks-widget";
 
 interface CourseLean {
   _id: Types.ObjectId;
@@ -16,15 +19,44 @@ interface CourseLean {
   grade: string | null;
 }
 
+interface UpcomingTaskLean {
+  _id: Types.ObjectId;
+  title: string;
+  status: ITask["status"];
+  dueDate: Date | null;
+  courseId: { code: string } | null;
+}
+
+const UPCOMING_TASKS_LIMIT = 5;
+
 export default async function DashboardPage() {
   const userId = await requireUserId();
   await connectToDatabase();
 
-  const [currentYear, currentSemester, allCourses] = await Promise.all([
+  const [currentYear, currentSemester, allCourses, incompleteTasks] = await Promise.all([
     AcademicYear.findOne({ userId, isCurrent: true }).lean(),
     Semester.findOne({ userId, isCurrent: true }).lean(),
     Course.find({ userId }).lean<CourseLean[]>(),
+    Task.find({ userId, status: { $ne: "completed" } })
+      .populate("courseId", "code")
+      .lean<UpcomingTaskLean[]>(),
   ]);
+
+  const upcomingTasks: UpcomingTaskData[] = [...incompleteTasks]
+    .sort((a, b) =>
+      compareTasks("dueDate")(
+        { dueDate: a.dueDate, priority: "medium", courseTitle: null },
+        { dueDate: b.dueDate, priority: "medium", courseTitle: null },
+      ),
+    )
+    .slice(0, UPCOMING_TASKS_LIMIT)
+    .map((task) => ({
+      id: task._id.toString(),
+      title: task.title,
+      dueDate: task.dueDate,
+      status: task.status,
+      courseCode: task.courseId?.code ?? null,
+    }));
 
   const currentSemesterCourses = currentSemester
     ? allCourses.filter(
@@ -51,20 +83,23 @@ export default async function DashboardPage() {
 
   if (!currentYear) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-        <p className="text-sm text-slate-400">{today}</p>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900">
-          Let&apos;s set up your academics
-        </h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-          Create your first academic year to start tracking semesters, courses, and your GPA.
-        </p>
-        <Link
-          href="/dashboard/academic-years"
-          className="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-        >
-          Create academic year
-        </Link>
+      <div className="space-y-8">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <p className="text-sm text-slate-400">{today}</p>
+          <h1 className="mt-2 text-xl font-semibold text-slate-900">
+            Let&apos;s set up your academics
+          </h1>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+            Create your first academic year to start tracking semesters, courses, and your GPA.
+          </p>
+          <Link
+            href="/dashboard/academic-years"
+            className="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+          >
+            Create academic year
+          </Link>
+        </div>
+        <UpcomingTasksWidget tasks={upcomingTasks} />
       </div>
     );
   }
@@ -84,6 +119,8 @@ export default async function DashboardPage() {
         <StatCard label="Credit units completed" value={String(cgpa.completedCreditUnits)} />
         <StatCard label="Credit units remaining" value={String(cgpa.remainingCreditUnits)} />
       </div>
+
+      <UpcomingTasksWidget tasks={upcomingTasks} />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-center justify-between">
