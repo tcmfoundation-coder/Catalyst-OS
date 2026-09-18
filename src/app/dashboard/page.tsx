@@ -6,9 +6,15 @@ import { AcademicYear } from "@/models/AcademicYear";
 import { Semester } from "@/models/Semester";
 import { Course } from "@/models/Course";
 import { Task, type ITask } from "@/models/Task";
+import { StudySession } from "@/models/StudySession";
+import { Habit } from "@/models/Habit";
+import { HabitLog } from "@/models/HabitLog";
 import { calculateCGPA, calculateSemesterGPA } from "@/lib/academic/gpa";
 import { compareTasks } from "@/lib/tasks/sort";
+import { formatDuration, minutesBetween, minutesOnDay } from "@/lib/study-sessions/summary";
+import { lastNDays } from "@/lib/habits/streak";
 import { UpcomingTasksWidget, type UpcomingTaskData } from "./upcoming-tasks-widget";
+import { StudyHabitsWidget } from "./study-habits-widget";
 
 interface CourseLean {
   _id: Types.ObjectId;
@@ -33,14 +39,33 @@ export default async function DashboardPage() {
   const userId = await requireUserId();
   await connectToDatabase();
 
-  const [currentYear, currentSemester, allCourses, incompleteTasks] = await Promise.all([
+  const now = new Date();
+  const todayUtcMidnight = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+
+  const [
+    currentYear,
+    currentSemester,
+    allCourses,
+    incompleteTasks,
+    studySessions,
+    totalHabits,
+    habitsCompletedToday,
+  ] = await Promise.all([
     AcademicYear.findOne({ userId, isCurrent: true }).lean(),
     Semester.findOne({ userId, isCurrent: true }).lean(),
     Course.find({ userId }).lean<CourseLean[]>(),
     Task.find({ userId, status: { $ne: "completed" } })
       .populate("courseId", "code")
       .lean<UpcomingTaskLean[]>(),
+    StudySession.find({ userId }).select("date durationMinutes").lean(),
+    Habit.countDocuments({ userId }),
+    HabitLog.countDocuments({ userId, date: todayUtcMidnight }),
   ]);
+
+  const studyToday = formatDuration(minutesOnDay(studySessions, now));
+  const studyThisWeek = formatDuration(minutesBetween(studySessions, lastNDays(7, now)[0], now));
 
   const upcomingTasks: UpcomingTaskData[] = [...incompleteTasks]
     .sort((a, b) =>
@@ -100,6 +125,12 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <UpcomingTasksWidget tasks={upcomingTasks} />
+        <StudyHabitsWidget
+          studyToday={studyToday}
+          studyThisWeek={studyThisWeek}
+          habitsCompletedToday={habitsCompletedToday}
+          totalHabits={totalHabits}
+        />
       </div>
     );
   }
@@ -121,6 +152,13 @@ export default async function DashboardPage() {
       </div>
 
       <UpcomingTasksWidget tasks={upcomingTasks} />
+
+      <StudyHabitsWidget
+        studyToday={studyToday}
+        studyThisWeek={studyThisWeek}
+        habitsCompletedToday={habitsCompletedToday}
+        totalHabits={totalHabits}
+      />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-center justify-between">

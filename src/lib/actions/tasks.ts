@@ -6,9 +6,9 @@ import { Types } from "mongoose";
 import { requireUserId } from "@/lib/dal";
 import { connectToDatabase } from "@/lib/db";
 import { Task } from "@/models/Task";
-import { Course } from "@/models/Course";
 import { TaskInputSchema, TaskStatusInputSchema } from "@/lib/tasks/validation";
 import { nextCompletedAt } from "@/lib/tasks/lifecycle";
+import { courseBelongsToUser } from "./course-ownership";
 
 export type ActionState = { error?: string } | undefined;
 
@@ -21,13 +21,6 @@ function readTaskInput(formData: FormData) {
     dueDate: String(formData.get("dueDate") ?? ""),
     courseId: String(formData.get("courseId") ?? ""),
   };
-}
-
-/** A task doesn't have to belong to a course, but if it does, that course must be the caller's own. */
-async function courseBelongsToUser(courseId: string, userId: string): Promise<boolean> {
-  if (!courseId) return true;
-  const course = await Course.findOne({ _id: courseId, userId }).select("_id");
-  return Boolean(course);
 }
 
 export async function createTask(_prevState: ActionState, formData: FormData): Promise<ActionState> {
