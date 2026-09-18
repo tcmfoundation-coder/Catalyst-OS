@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db";
 import { StudyMaterial } from "@/models/StudyMaterial";
 import { MaterialChunk } from "@/models/MaterialChunk";
 import { downloadToTempFile } from "@/lib/storage/s3";
+import { embedMaterialChunks } from "@/lib/embeddings/pipeline";
 import { runDocumentProcessor } from "./processor-runner";
 
 /**
@@ -74,6 +75,17 @@ export async function processStudyMaterial(materialId: string): Promise<void> {
     material.pageCount = result.metadata.pageCount;
     material.slideCount = result.metadata.slideCount;
     await material.save();
+
+    // Embedding is a separate, chunk-level concern from text extraction:
+    // the material is "ready" (readable) regardless of whether embedding
+    // succeeds. A failure here is captured per-chunk (embeddingStatus)
+    // rather than failing the whole material — extraction already
+    // succeeded and that's still useful on its own.
+    if (result.chunks.length > 0) {
+      await embedMaterialChunks(String(material._id)).catch((error) => {
+        console.error(`Embedding failed for material ${String(material._id)}:`, error);
+      });
+    }
   } catch (error) {
     material.status = "failed";
     material.processingError = error instanceof Error ? error.message : "Unknown processing error";

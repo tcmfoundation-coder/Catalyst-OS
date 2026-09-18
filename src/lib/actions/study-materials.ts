@@ -16,6 +16,7 @@ import {
 } from "@/lib/study-materials/constants";
 import { ConfirmUploadInputSchema, RequestUploadInputSchema } from "@/lib/study-materials/validation";
 import { processStudyMaterial } from "@/lib/study-materials/processing";
+import { removeChunkVector } from "@/lib/retrieval/index-manager";
 import { courseBelongsToUser } from "./course-ownership";
 
 export type UploadUrlResult =
@@ -119,6 +120,21 @@ export async function deleteMaterial(materialId: string): Promise<void> {
 
   const material = await StudyMaterial.findOneAndDelete({ _id: materialId, userId });
   if (!material) return;
+
+  // Vector labels must be invalidated in the index before the chunks that
+  // own them are gone from MongoDB — otherwise a concurrent index rebuild
+  // reading MongoDB mid-delete could race, and there'd be no record left
+  // of which labels needed removing.
+  const chunksToRemove = await MaterialChunk.find({ materialId: material._id }, { vectorLabel: 1 }).lean();
+  await Promise.all(
+    chunksToRemove
+      .filter((chunk) => chunk.vectorLabel != null)
+      .map((chunk) =>
+        removeChunkVector(chunk.vectorLabel as number).catch((error: unknown) => {
+          console.error(`Failed to remove vector for label ${chunk.vectorLabel}:`, error);
+        }),
+      ),
+  );
 
   await MaterialChunk.deleteMany({ materialId: material._id });
   await deleteObject(material.storageKey).catch((error: unknown) => {

@@ -46,6 +46,12 @@ processor/__pycache__
 processor/**/__pycache__
 processor/.pytest_cache
 
+# local embedding model weights, downloaded on first use (see processor/README.md)
+processor/.cache
+
+# persistent HNSW vector index (rebuildable from MongoDB — see src/lib/retrieval/)
+/.vector-index
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
