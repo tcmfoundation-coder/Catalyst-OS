@@ -86,17 +86,27 @@ from older Next.js versions in a few places, e.g. `proxy.ts` instead of
   boundary between application data and untrusted retrieved material, and
   an `LLMProvider` abstraction (Anthropic implementation) — see
   `src/lib/ai/orchestrator.ts` for the full flow.
-- AI Tutor (`src/lib/tutor/`, `/dashboard/tutor`): the first real feature
-  built on that foundation — ask a question, optionally scoped to a
-  material or course, and get an answer grounded in your own uploaded
-  study material with visible source attribution (material, page/slide,
-  heading). No fabricated citations: sources always come from
-  ContextAssembler's own retrieval output, never from the model. No
-  persistent chat history yet — each question is request-scoped.
+- AI Tutor (`src/lib/tutor/`, `/dashboard/tutor`): ask a question,
+  optionally scoped to a material or course, and get an answer grounded in
+  your own uploaded study material with visible source attribution
+  (material, page/slide, heading). No fabricated citations: sources always
+  come from ContextAssembler's own retrieval output, never from the model.
+- Persistent, multi-turn Tutor conversations (`TutorConversation` +
+  `TutorMessage` models, `src/lib/tutor/conversations.ts`,
+  `conversation-context.ts`, `conversation-policy.ts`): questions and
+  answers are saved per conversation, with a two-pane UI (conversation list
+  + active thread) at `/dashboard/tutor`. A follow-up's prompt includes a
+  bounded window of recent history (message-count and character ceilings
+  in one policy file) alongside — never instead of — the current question
+  and any retrieved material; conversation history is deliberately never
+  stored embeddings, retrieved chunk text, or full prompts, only messages
+  and citation metadata. Every read/write re-verifies conversationId (and
+  messageId) ownership server-side — a conversation ID from the browser is
+  never trusted on its own.
 
 Not built yet (by design — this is the foundation those features depend on):
-persistent chat history/streaming, quiz/flashcard generation, AI-generated
-study plans, voice. Those come after this foundation is solid.
+streaming, quiz/flashcard generation, AI-generated study plans, voice.
+Those come after this foundation is solid.
 
 ## Project structure
 
@@ -119,7 +129,9 @@ src/
                            # PromptBuilder, AIOrchestrator
     tutor/                 # AI Tutor: the first feature built on lib/ai —
                            # tutor-specific request/response shape + teaching
-                           # instructions, calls AIOrchestrator only
+                           # instructions, calls AIOrchestrator only; plus
+                           # persisted conversation CRUD, history bounding
+                           # policy, and title derivation
     storage/s3.ts          # S3-compatible object storage client
     auth.ts, dal.ts, db.ts # NextAuth config, session helpers, Mongoose connection
   models/                 # Mongoose schemas
