@@ -37,6 +37,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local S3-compatible storage for dev (see: npm run dev:storage)
+/.s3rver-data
+
+# python processor virtualenv
+processor/.venv
+processor/__pycache__
+processor/**/__pycache__
+processor/.pytest_cache
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

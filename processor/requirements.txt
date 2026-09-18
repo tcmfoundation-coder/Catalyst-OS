@@ -1,0 +1,8 @@
+pdfplumber==0.11.10
+python-docx==1.2.0
+python-pptx==1.0.2
+pydantic==2.13.5
+
+# dev/test only
+pytest==9.1.1
+reportlab==5.0.1
