@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:storage": "s3rver -d ./.s3rver-data -a 0.0.0.0 -p 4568 --configure-bucket catalysts-materials ./dev-storage/cors.xml"
