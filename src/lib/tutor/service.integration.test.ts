@@ -9,6 +9,8 @@ import { Counter } from "@/models/Counter";
 import { MaterialChunk } from "@/models/MaterialChunk";
 import { Semester } from "@/models/Semester";
 import { StudyMaterial } from "@/models/StudyMaterial";
+import { TutorConversation } from "@/models/TutorConversation";
+import { TutorMessage } from "@/models/TutorMessage";
 import { User } from "@/models/User";
 import { askTutor } from "./service";
 
@@ -147,6 +149,11 @@ describe("AI Tutor — real Mongo + real embeddings + fake LLM boundary", () => 
   }, 60000);
 
   afterAll(async () => {
+    // Every askTutor() call now persists a conversation + messages as a
+    // side effect — clean those up too, same as any other data these
+    // tests create.
+    await TutorMessage.deleteMany({ userId: { $in: [userAId, userBId] } });
+    await TutorConversation.deleteMany({ userId: { $in: [userAId, userBId] } });
     await MaterialChunk.deleteMany({ userId: { $in: [userAId, userBId] } });
     await StudyMaterial.deleteMany({ userId: { $in: [userAId, userBId] } });
     await Course.deleteMany({ userId: userAId });
@@ -234,6 +241,8 @@ describe("AI Tutor — real Mongo + real embeddings + fake LLM boundary", () => 
       expect(emptyResult.retrievalStatus).toBe("no_relevant_sources");
       expect(emptyResult.sources).toEqual([]);
     }
+    await TutorMessage.deleteMany({ userId: freshUser._id });
+    await TutorConversation.deleteMany({ userId: freshUser._id });
     await User.deleteOne({ _id: freshUser._id });
   }, 30000);
 
@@ -267,9 +276,10 @@ describe("AI Tutor — real Mongo + real embeddings + fake LLM boundary", () => 
     expect(result.ok).toBe(true);
     if (result.ok) {
       // User A owns only materialA — any source they get back must be
-      // theirs; user B's "Roman Republic" content must never appear.
+      // theirs; user B's "Roman Republic" material must never appear.
+      // (Tutor sources no longer carry the chunk's raw text at all — see
+      // TutorSourceView — so materialId is the check here.)
       expect(result.sources.every((source) => source.materialId === materialAId)).toBe(true);
-      expect(result.sources.every((source) => !source.text.includes("Roman Republic"))).toBe(true);
     }
   }, 30000);
 
