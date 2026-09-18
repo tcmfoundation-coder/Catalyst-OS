@@ -12,15 +12,17 @@ import { Semester } from "@/models/Semester";
 import { StudyMaterial } from "@/models/StudyMaterial";
 import { Task } from "@/models/Task";
 import { User } from "@/models/User";
+import { z } from "zod";
 import { getAcademicContext } from "./academic-context";
 import {
   LLMProviderError,
   type LLMGenerationRequest,
   type LLMGenerationResult,
   type LLMProvider,
+  type StructuredLLMGenerationRequest,
   type StructuredLLMGenerationResult,
 } from "./llm-provider";
-import { ask } from "./orchestrator";
+import { ask, askStructured } from "./orchestrator";
 
 /**
  * Exercises the real architecture end to end: real MongoDB, real
@@ -34,7 +36,10 @@ import { ask } from "./orchestrator";
 class FakeLLMProvider implements LLMProvider {
   public lastRequest: LLMGenerationRequest | null = null;
 
-  constructor(private readonly response: string | Error = "Fake answer citing the material.") {}
+  constructor(
+    private readonly response: string | Error = "Fake answer citing the material.",
+    private readonly structuredResponse: unknown = new Error("not used in these tests"),
+  ) {}
 
   async generate(request: LLMGenerationRequest): Promise<LLMGenerationResult> {
     this.lastRequest = request;
@@ -42,8 +47,16 @@ class FakeLLMProvider implements LLMProvider {
     return { text: this.response, model: "fake-model", stopReason: "end_turn", usage: { inputTokens: 1, outputTokens: 1 } };
   }
 
-  async generateStructured(): Promise<StructuredLLMGenerationResult> {
-    throw new Error("not used in these tests");
+  async generateStructured(request: StructuredLLMGenerationRequest): Promise<StructuredLLMGenerationResult> {
+    this.lastRequest = request;
+    if (this.structuredResponse instanceof Error) throw this.structuredResponse;
+    return {
+      text: JSON.stringify(this.structuredResponse),
+      structuredOutput: this.structuredResponse,
+      model: "fake-model",
+      stopReason: "end_turn",
+      usage: { inputTokens: 1, outputTokens: 1 },
+    };
   }
 }
 
@@ -296,4 +309,59 @@ describe("AI orchestration — real Mongo + real embeddings + fake LLM boundary"
     expect(result.ok).toBe(false);
     expect(fake.lastRequest).toBeNull();
   });
+
+  const GenericSchema = z.object({ summary: z.string(), keyPoints: z.array(z.string()) });
+
+  it("AIOrchestrator.askStructured(): shares the same real retrieval/context pipeline as ask(), validating the model's structured output", async () => {
+    const fake = new FakeLLMProvider(undefined, { summary: "RAM loses data on power loss.", keyPoints: ["volatile", "fast"] });
+    const result = await askStructured(
+      userAId,
+      { question: "What happens to memory when electricity is switched off?" },
+      GenericSchema,
+      "test_summary",
+      { llmProvider: fake },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.summary).toContain("RAM");
+      expect(result.retrievalStatus).toBe("ok");
+      expect(result.sources.length).toBeGreaterThan(0);
+      expect(result.sources[0].materialId).toBe(materialAId);
+    }
+    // Same trust-boundary prompt PromptBuilder always builds for ask().
+    expect(fake.lastRequest?.userInput).toContain("RAM is volatile memory");
+  }, 30000);
+
+  it("AIOrchestrator.askStructured(): rejects output that doesn't match the schema, still reporting real sources found", async () => {
+    const fake = new FakeLLMProvider(undefined, { summary: "RAM loses data.", keyPoints: "not an array" });
+    const result = await askStructured(
+      userAId,
+      { question: "What happens to memory when electricity is switched off?" },
+      GenericSchema,
+      "test_summary",
+      { llmProvider: fake },
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/schema/);
+      expect(result.retrievalStatus).toBe("ok");
+      expect(result.sources.length).toBeGreaterThan(0);
+    }
+  }, 30000);
+
+  it("AIOrchestrator.askStructured(): ownership isolation holds the same as ask()", async () => {
+    const fake = new FakeLLMProvider(undefined, { summary: "n/a", keyPoints: [] });
+    const result = await askStructured(
+      userBId,
+      { question: "volatile memory power removed", materialId: materialAId },
+      GenericSchema,
+      "test_summary",
+      { llmProvider: fake },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.sources).toEqual([]);
+      expect(result.retrievalStatus).toBe("no_relevant_sources");
+    }
+  }, 30000);
 });

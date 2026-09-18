@@ -103,7 +103,18 @@ export interface BuiltPrompt {
   userInput: string;
 }
 
-export function buildPrompt(context: AIContext): BuiltPrompt {
+export interface BuildPromptOptions {
+  /**
+   * Additional fixed, developer-authored behavioral instructions for a
+   * specific feature (e.g. the AI Tutor's teaching style) — appended to
+   * SYSTEM_INSTRUCTIONS, never derived from user/document/context data.
+   * The base trust-boundary rules above always apply regardless of what
+   * a feature adds here.
+   */
+  roleInstructions?: string;
+}
+
+export function buildPrompt(context: AIContext, options: BuildPromptOptions = {}): BuiltPrompt {
   const sections: string[] = [];
 
   const academicText = renderAcademicContext(context.academicContext);
@@ -129,8 +140,12 @@ export function buildPrompt(context: AIContext): BuiltPrompt {
 
   sections.push(`<user_question>\n${escapeForXmlLikeTag(context.question)}\n</user_question>`);
 
+  const systemInstructions = options.roleInstructions
+    ? `${SYSTEM_INSTRUCTIONS}\n\n${options.roleInstructions}`
+    : SYSTEM_INSTRUCTIONS;
+
   return {
-    systemInstructions: SYSTEM_INSTRUCTIONS,
+    systemInstructions,
     userInput: sections.join("\n\n"),
   };
 }

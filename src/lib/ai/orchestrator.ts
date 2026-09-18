@@ -1,22 +1,23 @@
 import "server-only";
-import { z } from "zod";
+import { z, type ZodType } from "zod";
 import { search } from "@/lib/retrieval/service";
 import { getAcademicContext } from "./academic-context";
 import { getLLMProvider } from "./anthropic-provider";
 import { build } from "./context-assembler";
 import { RETRIEVAL_POLICY } from "./constants";
-import { LLMProviderError, type LLMProvider } from "./llm-provider";
+import { type LLMProvider, type LLMUsage } from "./llm-provider";
 import { buildPrompt } from "./prompt-builder";
+import { generateStructuredOutput } from "./structured-output";
 import { logAskError, logAskEvent } from "./telemetry";
-import { ConversationTurnSchema, type AIContextSource, type RetrievalStatus } from "./types";
+import { ConversationTurnSchema, type AIContext, type AIContextSource, type RetrievalStatus } from "./types";
 
 /**
  * The application-level entry point for "ask a question, get a grounded
- * answer." A future chat UI, quiz generator, or study planner calls this
- * — and only this — without knowing that RAG, HNSW, or Anthropic exist
- * underneath. Coordinates RetrievalService (finds knowledge),
- * AcademicContextProvider (finds relevant structured context),
- * ContextAssembler (decides what the model actually sees), and
+ * answer." A future chat UI, quiz generator, tutor, or study planner
+ * calls this — and only this — without knowing that RAG, HNSW, or
+ * Anthropic exist underneath. Coordinates RetrievalService (finds
+ * knowledge), AcademicContextProvider (finds relevant structured
+ * context), ContextAssembler (decides what the model actually sees), and
  * LLMProvider (generates), keeping every one of those concerns in its
  * own file.
  *
@@ -28,6 +29,11 @@ import { ConversationTurnSchema, type AIContextSource, type RetrievalStatus } fr
  * downstream call, so nothing here can accidentally cross into another
  * user's data — and RetrievalService's own ownership enforcement holds
  * regardless, as defense in depth.
+ *
+ * ask() (free-text) and askStructured() (schema-validated JSON, e.g. for
+ * the AI Tutor) share one internal `prepare()` step — retrieval, academic
+ * context, context assembly, and prompt construction are identical either
+ * way; only the final LLM call differs.
  */
 
 export const AskRequestSchema = z.object({
@@ -42,6 +48,13 @@ export const AskRequestSchema = z.object({
 });
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
+export type AskFailure = {
+  ok: false;
+  error: string;
+  retrievalStatus: RetrievalStatus;
+  sources: AIContextSource[];
+};
+
 export type AskResult =
   | {
       ok: true;
@@ -49,29 +62,62 @@ export type AskResult =
       retrievalStatus: RetrievalStatus;
       sources: AIContextSource[];
       model: string;
-      usage: { inputTokens: number; outputTokens: number };
+      usage: LLMUsage;
     }
+  | AskFailure;
+
+export type StructuredAskResult<T> =
   | {
-      ok: false;
-      error: string;
+      ok: true;
+      data: T;
       retrievalStatus: RetrievalStatus;
       sources: AIContextSource[];
-    };
+      model: string;
+      usage: LLMUsage;
+    }
+  | AskFailure;
 
 export interface AskDependencies {
   /** Injectable for tests — see the "mock only the external LLM boundary" testing guidance this follows. */
   llmProvider?: LLMProvider;
+  /**
+   * Additional fixed, developer-authored instructions layered onto the
+   * base prompt (see prompt-builder.ts's BuildPromptOptions) for a
+   * specific feature's behavior (e.g. the AI Tutor's teaching style).
+   * Never derived from user/document/context data — the base trust
+   * boundary always applies regardless of what a feature adds here.
+   */
+  roleInstructions?: string;
 }
 
-export async function ask(userId: string, rawRequest: unknown, deps: AskDependencies = {}): Promise<AskResult> {
-  const totalStart = Date.now();
+interface PreparedRequest {
+  context: AIContext;
+  systemInstructions: string;
+  userInput: string;
+  hitCount: number;
+  retrievalMs: number;
+  academicContextMs: number;
+  contextAssemblyMs: number;
+}
+
+type PrepareOutcome = { ok: true; prepared: PreparedRequest } | { ok: false; result: AskFailure };
+
+async function prepare(
+  userId: string,
+  rawRequest: unknown,
+  deps: AskDependencies,
+  totalStart: number,
+): Promise<PrepareOutcome> {
   const parsed = AskRequestSchema.safeParse(rawRequest);
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Invalid request",
-      retrievalStatus: "no_relevant_sources",
-      sources: [],
+      result: {
+        ok: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid request",
+        retrievalStatus: "no_relevant_sources",
+        sources: [],
+      },
     };
   }
   const request = parsed.data;
@@ -101,12 +147,15 @@ export async function ask(userId: string, rawRequest: unknown, deps: AskDependen
         totalMs: Date.now() - totalStart,
       },
     });
-    return { ok: false, error: "Retrieval failed", retrievalStatus: "no_relevant_sources", sources: [] };
+    return { ok: false, result: { ok: false, error: "Retrieval failed", retrievalStatus: "no_relevant_sources", sources: [] } };
   }
   const retrievalMs = Date.now() - retrievalStart;
 
   const wantsAcademicContext =
-    request.includeAcademicContext || Boolean(request.courseId) || request.includeUpcomingTasks || request.includeRecentMemories;
+    request.includeAcademicContext ||
+    Boolean(request.courseId) ||
+    request.includeUpcomingTasks ||
+    request.includeRecentMemories;
   const academicStart = Date.now();
   let academicContext = null;
   if (wantsAcademicContext) {
@@ -135,9 +184,22 @@ export async function ask(userId: string, rawRequest: unknown, deps: AskDependen
   });
   const contextAssemblyMs = Date.now() - assemblyStart;
 
-  const provider = deps.llmProvider ?? getLLMProvider();
-  const { systemInstructions, userInput } = buildPrompt(context);
+  const { systemInstructions, userInput } = buildPrompt(context, { roleInstructions: deps.roleInstructions });
 
+  return {
+    ok: true,
+    prepared: { context, systemInstructions, userInput, hitCount: hits.length, retrievalMs, academicContextMs, contextAssemblyMs },
+  };
+}
+
+export async function ask(userId: string, rawRequest: unknown, deps: AskDependencies = {}): Promise<AskResult> {
+  const totalStart = Date.now();
+  const outcome = await prepare(userId, rawRequest, deps, totalStart);
+  if (!outcome.ok) return outcome.result;
+  const { context, systemInstructions, userInput, hitCount, retrievalMs, academicContextMs, contextAssemblyMs } =
+    outcome.prepared;
+
+  const provider = deps.llmProvider ?? getLLMProvider();
   const generationStart = Date.now();
   try {
     const result = await provider.generate({ systemInstructions, userInput });
@@ -146,7 +208,7 @@ export async function ask(userId: string, rawRequest: unknown, deps: AskDependen
     logAskEvent({
       userId,
       retrievalStatus: context.retrievalStatus,
-      candidateCount: hits.length,
+      candidateCount: hitCount,
       selectedSourceIds: context.sources.map((source) => source.chunkId),
       selectedScores: context.sources.map((source) => source.score),
       model: result.model,
@@ -170,7 +232,7 @@ export async function ask(userId: string, rawRequest: unknown, deps: AskDependen
       // reflect what actually happened during retrieval, not overwrite
       // it with a generic "error".
       retrievalStatus: context.retrievalStatus,
-      candidateCount: hits.length,
+      candidateCount: hitCount,
       selectedSourceIds: context.sources.map((source) => source.chunkId),
       selectedScores: context.sources.map((source) => source.score),
       model: "unknown",
@@ -181,13 +243,75 @@ export async function ask(userId: string, rawRequest: unknown, deps: AskDependen
         generationMs: Date.now() - generationStart,
         totalMs: Date.now() - totalStart,
       },
-      validationFailure: error instanceof LLMProviderError ? error.message : undefined,
+      validationFailure: error instanceof Error ? error.message : undefined,
     });
     return {
       ok: false,
-      error: error instanceof LLMProviderError ? error.message : "Generation failed",
+      error: error instanceof Error ? error.message : "Generation failed",
       retrievalStatus: context.retrievalStatus,
       sources: context.sources,
     };
   }
+}
+
+/**
+ * Same pipeline as ask(), but the model's output is required to match
+ * `schema` (validated by structured-output.ts) instead of free text —
+ * what the AI Tutor and future structured features (quizzes, flashcards,
+ * study plans) build on. `sources`/`retrievalStatus` in the result always
+ * come from ContextAssembler's own output, never from the model's
+ * structured payload — a caller can't accidentally trust model-invented
+ * citation metadata just because it asked for structured output.
+ */
+export async function askStructured<T>(
+  userId: string,
+  rawRequest: unknown,
+  schema: ZodType<T>,
+  schemaName: string,
+  deps: AskDependencies = {},
+): Promise<StructuredAskResult<T>> {
+  const totalStart = Date.now();
+  const outcome = await prepare(userId, rawRequest, deps, totalStart);
+  if (!outcome.ok) return outcome.result;
+  const { context, systemInstructions, userInput, hitCount, retrievalMs, academicContextMs, contextAssemblyMs } =
+    outcome.prepared;
+
+  const provider = deps.llmProvider ?? getLLMProvider();
+  const generationStart = Date.now();
+  const structured = await generateStructuredOutput(provider, { systemInstructions, userInput }, schema, schemaName);
+  const generationMs = Date.now() - generationStart;
+
+  if (!structured.ok) {
+    logAskError(userId, "generation", structured.error);
+    logAskEvent({
+      userId,
+      retrievalStatus: context.retrievalStatus,
+      candidateCount: hitCount,
+      selectedSourceIds: context.sources.map((source) => source.chunkId),
+      selectedScores: context.sources.map((source) => source.score),
+      model: "unknown",
+      durations: { retrievalMs, academicContextMs, contextAssemblyMs, generationMs, totalMs: Date.now() - totalStart },
+      validationFailure: structured.error,
+    });
+    return { ok: false, error: structured.error, retrievalStatus: context.retrievalStatus, sources: context.sources };
+  }
+
+  logAskEvent({
+    userId,
+    retrievalStatus: context.retrievalStatus,
+    candidateCount: hitCount,
+    selectedSourceIds: context.sources.map((source) => source.chunkId),
+    selectedScores: context.sources.map((source) => source.score),
+    model: structured.model,
+    durations: { retrievalMs, academicContextMs, contextAssemblyMs, generationMs, totalMs: Date.now() - totalStart },
+  });
+
+  return {
+    ok: true,
+    data: structured.data,
+    retrievalStatus: context.retrievalStatus,
+    sources: context.sources,
+    model: structured.model,
+    usage: structured.usage,
+  };
 }
