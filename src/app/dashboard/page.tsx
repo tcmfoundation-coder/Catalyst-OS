@@ -9,12 +9,16 @@ import { Task, type ITask } from "@/models/Task";
 import { StudySession } from "@/models/StudySession";
 import { Habit } from "@/models/Habit";
 import { HabitLog } from "@/models/HabitLog";
+import { LearningMemory } from "@/models/LearningMemory";
 import { calculateCGPA, calculateSemesterGPA } from "@/lib/academic/gpa";
 import { compareTasks } from "@/lib/tasks/sort";
 import { formatDuration, minutesBetween, minutesOnDay } from "@/lib/study-sessions/summary";
 import { lastNDays } from "@/lib/habits/streak";
 import { UpcomingTasksWidget, type UpcomingTaskData } from "./upcoming-tasks-widget";
 import { StudyHabitsWidget } from "./study-habits-widget";
+import { RecentMemoriesWidget, type RecentMemoryData } from "./recent-memories-widget";
+
+const RECENT_MEMORIES_LIMIT = 3;
 
 interface CourseLean {
   _id: Types.ObjectId;
@@ -52,6 +56,7 @@ export default async function DashboardPage() {
     studySessions,
     totalHabits,
     habitsCompletedToday,
+    recentMemories,
   ] = await Promise.all([
     AcademicYear.findOne({ userId, isCurrent: true }).lean(),
     Semester.findOne({ userId, isCurrent: true }).lean(),
@@ -62,10 +67,21 @@ export default async function DashboardPage() {
     StudySession.find({ userId }).select("date durationMinutes").lean(),
     Habit.countDocuments({ userId }),
     HabitLog.countDocuments({ userId, date: todayUtcMidnight }),
+    LearningMemory.find({ userId })
+      .select("content category")
+      .sort({ createdAt: -1 })
+      .limit(RECENT_MEMORIES_LIMIT)
+      .lean(),
   ]);
 
   const studyToday = formatDuration(minutesOnDay(studySessions, now));
   const studyThisWeek = formatDuration(minutesBetween(studySessions, lastNDays(7, now)[0], now));
+
+  const memories: RecentMemoryData[] = recentMemories.map((memory) => ({
+    id: memory._id.toString(),
+    content: memory.content,
+    category: memory.category,
+  }));
 
   const upcomingTasks: UpcomingTaskData[] = [...incompleteTasks]
     .sort((a, b) =>
@@ -131,6 +147,7 @@ export default async function DashboardPage() {
           habitsCompletedToday={habitsCompletedToday}
           totalHabits={totalHabits}
         />
+        <RecentMemoriesWidget memories={memories} />
       </div>
     );
   }
@@ -159,6 +176,8 @@ export default async function DashboardPage() {
         habitsCompletedToday={habitsCompletedToday}
         totalHabits={totalHabits}
       />
+
+      <RecentMemoriesWidget memories={memories} />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-center justify-between">
