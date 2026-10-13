@@ -8,6 +8,15 @@ See `AGENTS.md` for Next.js 16 conventions this codebase follows (it diverges
 from older Next.js versions in a few places, e.g. `proxy.ts` instead of
 `middleware.ts`).
 
+## Clients
+
+The Android-first React Native app lives in `mobile/` and is the primary
+client. The Next.js app remains the web companion and hosts Catalysts Core.
+Both clients use the same MongoDB models and domain logic; mobile requests go
+through the versioned `/api/mobile/v1/` routes rather than duplicating business
+rules in the phone app. See `mobile/README.md` to configure a device-reachable
+API URL and run Expo.
+
 ## Stack
 
 - Next.js 16 (App Router, TypeScript, Turbopack)
@@ -137,6 +146,7 @@ src/
     dashboard/            # protected app shell + pages, one folder per feature
     login/, register/     # auth pages
     api/auth/             # NextAuth handler + registration endpoint
+    api/mobile/v1/        # mobile session and dashboard API
   lib/
     academic/             # GPA engine + grading scale (pure, unit-tested)
     tasks/, study-sessions/, habits/, learning-memories/, study-materials/
@@ -165,6 +175,8 @@ src/
   models/                 # Mongoose schemas
   proxy.ts                # optimistic route-protection (Next.js 16's
                            # replacement for middleware.ts)
+mobile/                   # React Native + Expo Router client; separate TypeScript
+                           # and ESLint configs; see its README and AGENTS.md
 processor/                # standalone Python document processor — see its
                            # own README for the extraction/chunking pipeline
 ```
