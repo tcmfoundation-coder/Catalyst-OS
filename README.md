@@ -83,6 +83,50 @@ The image is built for production, listens on port 3000, and runs as a
 non-root user. The Expo mobile client is not included; it runs separately
 using the instructions in `mobile/README.md`.
 
+## Deploying on Render
+
+Deploy the web/API as a Docker **Web Service** from the GitHub repository.
+Choose the branch to deploy, select **Docker** as the runtime, and use the
+root `Dockerfile`. Do not deploy `compose.yaml` on Render; it is for local
+development and starts its own MongoDB service.
+
+Set these service environment variables in the Render Dashboard:
+
+| Variable | Value |
+| --- | --- |
+| `PORT` | `10000` |
+| `NEXTAUTH_URL` | The public service URL, such as `https://catalysts-web.onrender.com` |
+| `NEXTAUTH_SECRET` | A long, randomly generated secret |
+| `MONGODB_URI` | The production MongoDB connection string, for example a MongoDB Atlas URI |
+| `VECTOR_INDEX_DIR` | `/data/vector-index` |
+| `EMBEDDING_MODEL_CACHE_DIR` | `/data/embedding-models` |
+| `PROCESSOR_PYTHON_BIN` | `/opt/processor-venv/bin/python3` |
+
+Set the Render **Health Check Path** to `/api/health`. It returns HTTP 200 only
+when the app can connect to MongoDB and successfully ping it; database
+connection failures are logged and return HTTP 503.
+
+For MongoDB Atlas, configure Atlas network access to allow connections from
+the Render service's outbound IP ranges (shown under the service's **Connect**
+menu), or use a dedicated static outbound IP if your plan supports it. Ensure
+reserved characters in the database username or password are URL-encoded in
+`MONGODB_URI`.
+
+Optional integrations:
+
+- Set `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` to enable
+  study-material file storage. `S3_REGION` defaults to `us-east-1`;
+  `S3_ENDPOINT` is only needed for S3-compatible providers other than AWS, and
+  `S3_FORCE_PATH_STYLE` defaults to `false`.
+- Set `ANTHROPIC_API_KEY` to enable AI responses. `ANTHROPIC_MODEL` and
+  `ANTHROPIC_EFFORT` are optional and default in the application.
+
+Render's filesystem is ephemeral by default. If you want to retain the local
+vector index and downloaded embedding models between deploys, attach a
+persistent disk at `/data` (available on eligible paid plans). Without a disk,
+those files may need to be recreated after a restart or deployment. MongoDB
+data is stored in the external database, not on this disk.
+
 ## Scripts
 
 - `npm run dev` — start the dev server
