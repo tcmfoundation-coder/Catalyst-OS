@@ -24,12 +24,14 @@ import { runDocumentProcessor } from "./processor-runner";
 export async function processStudyMaterial(materialId: string): Promise<void> {
   await connectToDatabase();
 
-  const material = await StudyMaterial.findById(materialId);
+  // Claim only queued uploads. A retried confirmation or two concurrent
+  // worker triggers must never process the same material twice.
+  const material = await StudyMaterial.findOneAndUpdate(
+    { _id: materialId, status: "uploaded" },
+    { $set: { status: "processing", processingError: null } },
+    { new: true },
+  );
   if (!material) return;
-
-  material.status = "processing";
-  material.processingError = null;
-  await material.save();
 
   let tempFilePath: string | null = null;
   try {
@@ -46,6 +48,18 @@ export async function processStudyMaterial(materialId: string): Promise<void> {
 
     if (result.requiresOcr) {
       material.status = "needs_ocr";
+      material.pageCount = result.metadata.pageCount;
+      material.title = result.metadata.title;
+      await material.save();
+      return;
+    }
+
+    if (result.chunks.length === 0) {
+      material.status = "failed";
+      material.processingError = "No readable text was found in this document.";
+      material.title = result.metadata.title;
+      material.pageCount = result.metadata.pageCount;
+      material.slideCount = result.metadata.slideCount;
       await material.save();
       return;
     }
@@ -70,11 +84,9 @@ export async function processStudyMaterial(materialId: string): Promise<void> {
       );
     }
 
-    material.status = "ready";
     material.title = result.metadata.title;
     material.pageCount = result.metadata.pageCount;
     material.slideCount = result.metadata.slideCount;
-    await material.save();
 
     // Embedding is a separate, chunk-level concern from text extraction:
     // the material is "ready" (readable) regardless of whether embedding
@@ -86,6 +98,12 @@ export async function processStudyMaterial(materialId: string): Promise<void> {
         console.error(`Embedding failed for material ${String(material._id)}:`, error);
       });
     }
+
+    // Keep the material in "processing" until both extracted text and its
+    // search index have finished. Otherwise the UI can offer Tutor while
+    // its chunks are still absent from semantic search.
+    material.status = "ready";
+    await material.save();
   } catch (error) {
     material.status = "failed";
     material.processingError = error instanceof Error ? error.message : "Unknown processing error";

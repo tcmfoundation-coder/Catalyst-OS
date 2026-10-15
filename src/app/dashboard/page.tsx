@@ -124,18 +124,19 @@ export default async function DashboardPage() {
 
   if (!currentYear) {
     return (
-      <div className="space-y-8">
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <p className="text-sm text-slate-400">{today}</p>
-          <h1 className="mt-2 text-xl font-semibold text-slate-900">
+      <div className="dashboard-grid space-y-6 rounded-3xl p-1 sm:p-3">
+        <div className="hud-panel relative overflow-hidden rounded-3xl p-8 text-center sm:p-12">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+          <p className="font-mono text-[10px] tracking-[0.24em] text-accent uppercase">System initialization · {today}</p>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Let&apos;s set up your academics
           </h1>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
             Create your first academic year to start tracking semesters, courses, and your GPA.
           </p>
           <Link
             href="/dashboard/academic-years"
-            className="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            className="mt-7 inline-flex min-h-11 items-center rounded-lg border border-accent/40 bg-accent px-5 text-sm font-semibold text-[#10170c] transition hover:bg-[#bcff6e]"
           >
             Create academic year
           </Link>
@@ -153,61 +154,71 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-sm text-slate-400">{today}</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          {currentSemester ? `${currentSemester.name} · ${currentYear.label}` : currentYear.label}
-        </h1>
+    <div className="dashboard-grid space-y-5 rounded-3xl p-1 sm:p-3">
+      <section className="hud-panel relative overflow-hidden rounded-3xl p-6 sm:p-8">
+        <div className="absolute -right-12 -top-28 h-72 w-72 rounded-full border border-accent/10" />
+        <div className="absolute -right-2 -top-16 h-52 w-52 rounded-full border border-accent/10" />
+        <div className="absolute right-12 top-0 h-36 w-36 rounded-full bg-accent/5 blur-3xl" />
+        <div className="relative">
+          <p className="font-mono text-[10px] tracking-[0.24em] text-accent uppercase">Learning command · {today}</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            {currentSemester ? currentSemester.name : currentYear.label}
+          </h1>
+          <p className="mt-2 text-sm text-muted">{currentSemester ? `Academic year ${currentYear.label}` : "Your academic system is online."}</p>
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-3 py-1.5 font-mono text-[10px] tracking-[0.14em] text-accent uppercase">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_#a5f34b]" /> Academic system active
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Cumulative GPA" value={cgpa.gpa.toFixed(2)} detail="ACADEMIC INDEX" />
+        <StatCard label="Semester GPA" value={semesterGpa.gpa.toFixed(2)} detail="CURRENT CYCLE" />
+        <StatCard label="Units completed" value={String(cgpa.completedCreditUnits)} detail="CREDITS BANKED" />
+        <StatCard label="Units remaining" value={String(cgpa.remainingCreditUnits)} detail="TO COMPLETION" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="CGPA" value={cgpa.gpa.toFixed(2)} />
-        <StatCard label="Semester GPA" value={semesterGpa.gpa.toFixed(2)} />
-        <StatCard label="Credit units completed" value={String(cgpa.completedCreditUnits)} />
-        <StatCard label="Credit units remaining" value={String(cgpa.remainingCreditUnits)} />
-      </div>
-
-      <UpcomingTasksWidget tasks={upcomingTasks} />
-
-      <StudyHabitsWidget
-        studyToday={studyToday}
-        studyThisWeek={studyThisWeek}
-        habitsCompletedToday={habitsCompletedToday}
-        totalHabits={totalHabits}
-      />
-
-      <RecentMemoriesWidget memories={memories} />
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Current courses</h2>
+      <div className="grid gap-5 xl:grid-cols-[1.35fr_0.85fr]">
+        <div className="space-y-5">
+          <UpcomingTasksWidget tasks={upcomingTasks} />
+          <StudyHabitsWidget
+            studyToday={studyToday}
+            studyThisWeek={studyThisWeek}
+            habitsCompletedToday={habitsCompletedToday}
+            totalHabits={totalHabits}
+          />
+        </div>
+        <div className="space-y-5">
+          <RecentMemoriesWidget memories={memories} />
+          <section className="hud-panel rounded-2xl p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Current courses</h2>
           {currentSemester && (
             <Link
               href={`/dashboard/semesters/${currentSemester._id.toString()}`}
-              className="text-sm font-medium text-indigo-600 hover:underline"
+              className="text-xs font-medium text-accent hover:underline"
             >
               Manage courses
             </Link>
           )}
         </div>
         {!currentSemester ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             You haven&apos;t added a semester yet.{" "}
             <Link
               href={`/dashboard/academic-years/${currentYear._id.toString()}`}
-              className="font-medium text-indigo-600 hover:underline"
+              className="font-medium text-accent hover:underline"
             >
               Add one
             </Link>{" "}
             to start tracking courses.
           </p>
         ) : currentSemesterCourses.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             No courses yet for this semester.{" "}
             <Link
               href={`/dashboard/semesters/${currentSemester._id.toString()}`}
-              className="font-medium text-indigo-600 hover:underline"
+              className="font-medium text-accent hover:underline"
             >
               Add your first course
             </Link>
@@ -216,7 +227,7 @@ export default async function DashboardPage() {
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-slate-400">
+              <tr className="border-b border-line text-[10px] tracking-wider text-muted uppercase">
                 <th className="pb-2 font-medium">Code</th>
                 <th className="pb-2 font-medium">Title</th>
                 <th className="pb-2 font-medium">Units</th>
@@ -225,26 +236,29 @@ export default async function DashboardPage() {
             </thead>
             <tbody>
               {currentSemesterCourses.map((course) => (
-                <tr key={course._id.toString()} className="border-b border-slate-50 last:border-0">
-                  <td className="py-2 font-medium text-slate-900">{course.code}</td>
-                  <td className="py-2 text-slate-600">{course.title}</td>
-                  <td className="py-2 text-slate-600">{course.creditUnits}</td>
-                  <td className="py-2 text-slate-600">{course.grade ?? "—"}</td>
+                <tr key={course._id.toString()} className="border-b border-line/70 last:border-0">
+                  <td className="py-3 font-mono text-xs font-semibold text-accent">{course.code}</td>
+                  <td className="py-3 text-muted">{course.title}</td>
+                  <td className="py-3 text-muted">{course.creditUnits}</td>
+                  <td className="py-3 text-foreground">{course.grade ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-medium text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+    <div className="hud-panel rounded-2xl p-4 sm:p-5">
+      <p className="font-mono text-[9px] tracking-[0.16em] text-muted uppercase">{detail}</p>
+      <p className="mt-3 text-xs font-medium text-muted">{label}</p>
+      <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
     </div>
   );
 }

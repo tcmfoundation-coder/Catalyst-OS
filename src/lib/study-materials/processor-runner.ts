@@ -1,19 +1,11 @@
 import "server-only";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parseProcessorOutput, type ProcessorResult } from "./processor-result";
+import { resolveProcessorPythonBin } from "./python-runtime";
 import type { MaterialFormat } from "./constants";
 
 const PROCESSOR_DIR = path.join(process.cwd(), "processor");
-
-function resolvePythonBin(): string {
-  if (process.env.PROCESSOR_PYTHON_BIN) {
-    return process.env.PROCESSOR_PYTHON_BIN;
-  }
-  const venvPython = path.join(PROCESSOR_DIR, ".venv", "bin", "python3");
-  return existsSync(venvPython) ? venvPython : "python3";
-}
 
 /**
  * Spawns the Python document processor and waits for its single line of
@@ -24,7 +16,7 @@ function resolvePythonBin(): string {
  */
 export function runDocumentProcessor(filePath: string, format: MaterialFormat): Promise<ProcessorResult> {
   return new Promise((resolve) => {
-    const child = spawn(resolvePythonBin(), ["-m", "processor.cli", filePath, "--format", format], {
+    const child = spawn(resolveProcessorPythonBin(), ["-m", "processor.cli", filePath, "--format", format], {
       cwd: PROCESSOR_DIR,
     });
 

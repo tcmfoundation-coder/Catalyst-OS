@@ -5,7 +5,10 @@
  */
 
 export const DEFAULT_LLM_MODEL = "claude-sonnet-5";
-export const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+// Claude's output cap includes adaptive-thinking tokens as well as the
+// visible answer. Leave enough room for multi-step tutoring and structured
+// responses without forcing the model to consume the full allowance.
+export const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 
 /**
  * Retrieval and context-assembly policy. topK/minimumSimilarity are
@@ -40,8 +43,7 @@ export const RESOURCE_RETRIEVAL_POLICY = {
 
 /**
  * Structured resources (multi-section notes, and later quizzes/flashcards)
- * produce a larger JSON payload than a Tutor answer — DEFAULT_MAX_OUTPUT_TOKENS
- * (1024) is tuned for a short answer and would truncate a several-section
- * response into invalid JSON.
+ * have their own larger output cap so a multi-section response has room to
+ * finish as valid JSON, independently of the Tutor generation setting.
  */
 export const RESOURCE_GENERATION_MAX_OUTPUT_TOKENS = 4096;

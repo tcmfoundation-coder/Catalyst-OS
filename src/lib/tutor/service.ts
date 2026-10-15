@@ -70,7 +70,7 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
       sources: [],
     };
   }
-  const { question, materialId, courseId, conversationId: existingConversationId } = parsed.data;
+  const { question, materialId, courseId, conversationId: existingConversationId, includeAcademicContext, includeUpcomingTasks, includeRecentMemories } = parsed.data;
 
   await connectToDatabase();
 
@@ -110,7 +110,7 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
 
   const structured = await askStructured(
     userId,
-    { question, materialId: effectiveMaterialId, courseId: effectiveCourseId, conversationContext },
+    { question, materialId: effectiveMaterialId, courseId: effectiveCourseId, conversationContext, includeAcademicContext, includeUpcomingTasks, includeRecentMemories },
     TutorModelOutputSchema,
     TUTOR_SCHEMA_NAME,
     { llmProvider: deps.llmProvider, roleInstructions: TUTOR_ROLE_INSTRUCTIONS },

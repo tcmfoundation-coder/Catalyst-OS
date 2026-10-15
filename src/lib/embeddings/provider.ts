@@ -1,19 +1,11 @@
 import "server-only";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { CURRENT_EMBEDDING_DIMENSION, CURRENT_EMBEDDING_MODEL } from "./constants";
 import { parseEmbedOutput, type EmbedResult } from "./embed-result";
+import { resolveProcessorPythonBin } from "@/lib/study-materials/python-runtime";
 
 const PROCESSOR_DIR = path.join(process.cwd(), "processor");
-
-function resolvePythonBin(): string {
-  if (process.env.PROCESSOR_PYTHON_BIN) {
-    return process.env.PROCESSOR_PYTHON_BIN;
-  }
-  const venvPython = path.join(PROCESSOR_DIR, ".venv", "bin", "python3");
-  return existsSync(venvPython) ? venvPython : "python3";
-}
 
 export class EmbeddingProviderError extends Error {}
 
@@ -44,7 +36,7 @@ export interface EmbeddingProvider {
  */
 function runEmbedCli(mode: "documents" | "query", texts: string[]): Promise<EmbedResult> {
   return new Promise((resolve) => {
-    const child = spawn(resolvePythonBin(), ["-m", "processor.embed_cli", "--mode", mode], {
+    const child = spawn(resolveProcessorPythonBin(), ["-m", "processor.embed_cli", "--mode", mode], {
       cwd: PROCESSOR_DIR,
     });
 

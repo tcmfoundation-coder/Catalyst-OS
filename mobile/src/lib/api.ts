@@ -33,9 +33,54 @@ export interface DashboardResponse {
     dueDate: string | null;
     courseCode: string | null;
   }[];
-  study: { today: string; thisWeek: string };
+  study: { today: string; thisWeek: string; thisWeekMinutes: number };
+  performance: {
+    days: { date: string; studyMinutes: number; completedTasks: number }[];
+    current: { studyMinutes: number; completedTasks: number };
+    previous: { studyMinutes: number; completedTasks: number };
+  };
   habits: { completedToday: number; total: number };
 }
+
+export interface DailyPriorityResponse {
+  recommendation: {
+    title: string;
+    reason: string;
+    nextStep: string;
+    taskId: string | null;
+  };
+}
+
+export interface MobileTask {
+  id: string;
+  courseId: string | null;
+  title: string;
+  description: string | null;
+  type: string;
+  priority: string;
+  status: "todo" | "in_progress" | "completed";
+  dueDate: string | null;
+  courseCode: string | null;
+}
+
+export interface TutorResponse {
+  ok: boolean;
+  conversationId: string | null;
+  answer?: string;
+  error?: string;
+  followUpQuestion: string | null;
+  retrievalStatus: string;
+  sources: { materialId: string; courseId: string | null; page: number | null; slide: number | null; heading: string | null }[];
+}
+
+export interface AcademicData {
+  years: { id: string; label: string; isCurrent: boolean }[];
+  semesters: { id: string; academicYearId: string; name: string; isCurrent: boolean }[];
+  courses: { id: string; semesterId: string; code: string; title: string; creditUnits: number; grade: string | null }[];
+}
+export interface MobileMaterial { id: string; filename: string; format: string; sizeBytes: number; status: string; processingError: string | null; title: string | null; courseId: string | null; courseCode: string | null; createdAt: string }
+export interface MobileNote { id: string; title: string; materialId: string; createdAt: string }
+export interface MobileNoteDetail extends MobileNote { content: { title: string; overview: string; sections: { heading: string; summary: string; keyPoints: string[]; definitions: {term: string;definition: string}[]; examples: string[] }[] }; sources: {materialId: string; page?: number; slide?: number; heading?: string}[] }
 
 export class ApiError extends Error {
   constructor(
@@ -106,3 +151,89 @@ export function revokeMobileSession(token: string) {
 export function getDashboard(token: string) {
   return request<DashboardResponse>("/api/mobile/v1/dashboard", {}, token);
 }
+
+export function getDailyPriority(token: string) {
+  return request<DailyPriorityResponse>("/api/mobile/v1/daily-priority", { method: "POST" }, token);
+}
+
+export function getTasks(token: string) {
+  return request<MobileTask[]>("/api/mobile/v1/tasks", {}, token);
+}
+
+export function createTask(token: string, input: {
+  title: string;
+  description: string;
+  type: string;
+  priority: string;
+  dueDate: string;
+  courseId: string;
+}) {
+  return request<{ id: string; title: string; status: string }>("/api/mobile/v1/tasks", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function updateTask(token: string, id: string, input: {
+  title: string;
+  description: string;
+  type: string;
+  priority: string;
+  dueDate: string;
+  courseId: string;
+}) {
+  return request<{ id: string; title: string; status: string }>(`/api/mobile/v1/tasks/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function deleteTask(token: string, id: string) {
+  return request<void>(`/api/mobile/v1/tasks/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
+}
+
+export function updateTaskStatus(token: string, id: string, status: MobileTask["status"]) {
+  return request<{ id: string; status: string }>(`/api/mobile/v1/tasks/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }, token);
+}
+
+export function createStudySession(token: string, input: { date: string; durationMinutes: string; courseId: string; notes: string }) {
+  return request<{ id: string; durationMinutes: number }>("/api/mobile/v1/study-sessions", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function createHabit(token: string, input: { name: string; description: string }) {
+  return request<{ id: string; name: string }>("/api/mobile/v1/habits", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function createMemory(token: string, input: { content: string; category: string; courseId: string }) {
+  return request<{ id: string; content: string; category: string }>("/api/mobile/v1/memories", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function askTutor(token: string, input: { question: string; courseId?: string; materialId?: string; conversationId?: string; includeAcademicContext?: boolean; includeUpcomingTasks?: boolean }) {
+  return request<TutorResponse>("/api/mobile/v1/tutor", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, token);
+}
+
+export function getAcademicData(token: string) { return request<AcademicData>("/api/mobile/v1/academic", {}, token); }
+export function academicAction(token: string, input: Record<string, unknown>) { return request<{ok: boolean}>("/api/mobile/v1/academic", { method: "POST", body: JSON.stringify(input) }, token); }
+export function getMaterials(token: string) { return request<MobileMaterial[]>("/api/mobile/v1/materials", {}, token); }
+export function uploadMaterialRequest(token: string, input: { filename: string; sizeBytes: number; courseId: string }) { return request<{uploadUrl: string;storageKey: string;contentType: string}>("/api/mobile/v1/materials", {method:"POST",body:JSON.stringify({action:"requestUpload",...input})}, token); }
+export function confirmMaterialUpload(token: string, input: { storageKey: string; originalFilename: string; courseId: string }) { return request<{materialId: string}>("/api/mobile/v1/materials", {method:"POST",body:JSON.stringify({action:"confirmUpload",...input})}, token); }
+export function retryMaterialProcessing(token: string, materialId: string) { return request<{ok: true}>("/api/mobile/v1/materials", {method:"POST",body:JSON.stringify({action:"retryProcessing",materialId})}, token); }
+export function getStudyNotes(token: string) { return request<MobileNote[]>("/api/mobile/v1/study-notes", {}, token); }
+export function generateStudyNotes(token: string, materialId: string, courseId?: string) { return request<{resourceId: string;content: MobileNoteDetail["content"]}>("/api/mobile/v1/study-notes", {method:"POST",body:JSON.stringify({materialId,courseId})}, token); }
+export function getStudyNote(token: string, id: string) { return request<MobileNoteDetail>(`/api/mobile/v1/study-notes/${encodeURIComponent(id)}`, {}, token); }
+export function deleteStudyNote(token: string, id: string) { return request<void>(`/api/mobile/v1/study-notes/${encodeURIComponent(id)}`, {method:"DELETE"}, token); }

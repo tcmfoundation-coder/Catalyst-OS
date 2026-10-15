@@ -5,6 +5,7 @@ import { authenticateMobileRequest } from "@/lib/mobile/auth";
 import { lastNDays } from "@/lib/habits/streak";
 import { formatDuration, minutesBetween, minutesOnDay } from "@/lib/study-sessions/summary";
 import { compareTasks } from "@/lib/tasks/sort";
+import { buildPerformanceTrend, getPerformanceTrendRange } from "@/lib/dashboard/performance-trend";
 import type { ITask } from "@/models/Task";
 import { AcademicYear } from "@/models/AcademicYear";
 import { Course } from "@/models/Course";
@@ -13,9 +14,13 @@ import { HabitLog } from "@/models/HabitLog";
 import { Semester } from "@/models/Semester";
 import { StudySession } from "@/models/StudySession";
 import { Task } from "@/models/Task";
+import { mobileApiHeaders, mobileApiOptions } from "@/lib/mobile/cors";
 
-const NO_STORE = { "Cache-Control": "no-store" };
 const UPCOMING_TASKS_LIMIT = 5;
+
+export function OPTIONS(request: Request) {
+  return mobileApiOptions(request);
+}
 
 interface CourseLean {
   _id: Types.ObjectId;
@@ -36,16 +41,18 @@ interface TaskLean {
 }
 
 export async function GET(request: Request) {
+  const headers = mobileApiHeaders(request);
   const principal = await authenticateMobileRequest(request);
   if (!principal) {
-    return NextResponse.json({ error: "Unauthenticated" }, { status: 401, headers: NO_STORE });
+    return NextResponse.json({ error: "Unauthenticated" }, { status: 401, headers });
   }
 
   const userId = principal.userId;
   const now = new Date();
   const todayUtcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const trendRange = getPerformanceTrendRange(now);
 
-  const [currentYear, currentSemester, courses, tasks, studySessions, totalHabits, completedHabits] =
+  const [currentYear, currentSemester, courses, tasks, studySessions, completedTasks, totalHabits, completedHabits] =
     await Promise.all([
       AcademicYear.findOne({ userId, isCurrent: true }).lean(),
       Semester.findOne({ userId, isCurrent: true }).lean(),
@@ -53,7 +60,16 @@ export async function GET(request: Request) {
       Task.find({ userId, status: { $ne: "completed" } })
         .populate("courseId", "code title")
         .lean<TaskLean[]>(),
-      StudySession.find({ userId }).select("date durationMinutes").lean(),
+      StudySession.find({ userId, date: { $gte: trendRange.from, $lt: trendRange.to } })
+        .select("date durationMinutes")
+        .lean(),
+      Task.find({
+        userId,
+        status: "completed",
+        completedAt: { $gte: trendRange.from, $lt: trendRange.to },
+      })
+        .select("completedAt")
+        .lean(),
       Habit.countDocuments({ userId }),
       HabitLog.countDocuments({ userId, date: todayUtcMidnight }),
     ]);
@@ -63,6 +79,8 @@ export async function GET(request: Request) {
     : [];
   const cgpa = calculateCGPA(courses);
   const semesterGpa = calculateSemesterGPA(semesterCourses);
+  const performance = buildPerformanceTrend(studySessions, completedTasks, now);
+  const thisWeekMinutes = minutesBetween(studySessions, lastNDays(7, now)[0], now);
   const upcomingTasks = [...tasks]
     .sort((a, b) =>
       compareTasks("dueDate")(
@@ -109,10 +127,12 @@ export async function GET(request: Request) {
       tasks: upcomingTasks,
       study: {
         today: formatDuration(minutesOnDay(studySessions, now)),
-        thisWeek: formatDuration(minutesBetween(studySessions, lastNDays(7, now)[0], now)),
+        thisWeek: formatDuration(thisWeekMinutes),
+        thisWeekMinutes,
       },
+      performance,
       habits: { completedToday: completedHabits, total: totalHabits },
     },
-    { headers: NO_STORE },
+    { headers },
   );
 }

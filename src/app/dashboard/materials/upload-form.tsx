@@ -28,6 +28,7 @@ function uploadWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
+    xhr.timeout = 120_000;
     xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -41,7 +42,8 @@ function uploadWithProgress(
         reject(new Error(`Upload failed with status ${xhr.status}`));
       }
     };
-    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.onerror = () => reject(new Error("Could not reach file storage. Check storage CORS settings and your connection."));
+    xhr.ontimeout = () => reject(new Error("Upload timed out. Check your connection and try again."));
     xhr.send(file);
   });
 }
@@ -66,44 +68,42 @@ export function UploadForm({ courses }: { courses: CourseOption[] }) {
       setError("Choose a file first");
       return;
     }
+    if (file.size < 1) {
+      setError("The selected file is empty");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setError("File is larger than the 25 MB limit");
+      return;
+    }
 
     setFileName(file.name);
     setPhase("requesting");
-
-    const urlResult = await requestMaterialUploadUrl({
-      filename: file.name,
-      sizeBytes: file.size,
-      courseId,
-    });
-    if ("error" in urlResult) {
-      setError(urlResult.error);
-      setPhase("error");
-      return;
-    }
-
-    setPhase("uploading");
-    setProgress(0);
     try {
+      const urlResult = await requestMaterialUploadUrl({
+        filename: file.name,
+        sizeBytes: file.size,
+        courseId,
+      });
+      if ("error" in urlResult) throw new Error(urlResult.error);
+
+      setPhase("uploading");
+      setProgress(0);
       await uploadWithProgress(urlResult.uploadUrl, file, urlResult.contentType, setProgress);
-    } catch {
-      setError("Upload to storage failed. Please try again.");
-      setPhase("error");
-      return;
-    }
 
-    setPhase("confirming");
-    const confirmResult = await confirmMaterialUpload({
-      storageKey: urlResult.storageKey,
-      originalFilename: file.name,
-      courseId,
-    });
-    if ("error" in confirmResult) {
-      setError(confirmResult.error);
-      setPhase("error");
-      return;
-    }
+      setPhase("confirming");
+      const confirmResult = await confirmMaterialUpload({
+        storageKey: urlResult.storageKey,
+        originalFilename: file.name,
+        courseId,
+      });
+      if ("error" in confirmResult) throw new Error(confirmResult.error);
 
-    router.push(`/dashboard/materials/${confirmResult.materialId}`);
+      router.push(`/dashboard/materials/${confirmResult.materialId}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Upload failed. Please try again.");
+      setPhase("error");
+    }
   }
 
   return (

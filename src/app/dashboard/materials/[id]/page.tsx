@@ -10,6 +10,7 @@ import { FORMAT_LABELS } from "@/lib/study-materials/constants";
 import { MaterialStatusBadge } from "../material-status-badge";
 import { DeleteMaterialButton } from "../delete-material-button";
 import { formatFileSize } from "../format-file-size";
+import { RetryProcessingButton } from "../retry-processing-button";
 
 interface MaterialLean {
   _id: Types.ObjectId;
@@ -125,6 +126,7 @@ export default async function MaterialDetailPage({
           {material.processingError && (
             <p className="mt-1 text-sm text-red-600">{material.processingError}</p>
           )}
+          <RetryProcessingButton materialId={id} />
         </div>
       ) : (
         <section className="rounded-2xl border border-slate-200 bg-white p-6">

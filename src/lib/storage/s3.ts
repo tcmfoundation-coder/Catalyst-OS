@@ -85,7 +85,11 @@ export async function headObject(key: string): Promise<ObjectHead | null> {
       contentType: result.ContentType ?? null,
     };
   } catch (error) {
-    if (error instanceof Error && error.name === "NotFound") {
+    const isObjectNotFound = error && typeof error === "object" && (
+      ("name" in error && (error.name === "NotFound" || error.name === "NoSuchKey")) ||
+      ("$metadata" in error && Boolean(error.$metadata && typeof error.$metadata === "object" && "httpStatusCode" in error.$metadata && error.$metadata.httpStatusCode === 404))
+    );
+    if (isObjectNotFound) {
       return null;
     }
     throw error;

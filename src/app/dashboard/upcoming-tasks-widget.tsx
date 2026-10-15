@@ -12,11 +12,11 @@ export interface UpcomingTaskData {
 }
 
 const URGENCY_STYLES: Record<TaskUrgency, string> = {
-  overdue: "text-red-600",
-  "due-today": "text-amber-600",
-  upcoming: "text-slate-500",
-  "no-due-date": "text-slate-400",
-  completed: "text-slate-400",
+  overdue: "text-danger",
+  "due-today": "text-caution",
+  upcoming: "text-muted",
+  "no-due-date": "text-muted",
+  completed: "text-muted",
 };
 
 function formatDueDate(dueDate: Date): string {
@@ -42,20 +42,20 @@ export function UpcomingTasksWidget({
   now?: Date;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6">
+    <section className="hud-panel rounded-2xl p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-900">What&apos;s next</h2>
+        <h2 className="text-sm font-semibold text-foreground">Mission queue</h2>
         <Link
           href="/dashboard/tasks"
-          className="text-sm font-medium text-indigo-600 hover:underline"
+          className="text-xs font-medium text-accent hover:underline"
         >
           View all tasks
         </Link>
       </div>
       {tasks.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Nothing on your list.{" "}
-          <Link href="/dashboard/tasks/new" className="font-medium text-indigo-600 hover:underline">
+          <Link href="/dashboard/tasks/new" className="font-medium text-accent hover:underline">
             Add a task
           </Link>
           .
@@ -67,18 +67,18 @@ export function UpcomingTasksWidget({
             return (
               <div
                 key={task.id}
-                className="flex items-center gap-3 border-b border-slate-100 py-2 last:border-0"
+                className="flex items-center gap-3 border-b border-line/70 py-3 last:border-0"
               >
                 <StatusToggle taskId={task.id} completed={task.status === "completed"} />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/dashboard/tasks/${task.id}/edit`}
-                    className="block truncate text-sm font-medium text-slate-900 hover:text-indigo-600"
+                    className="block truncate text-sm font-medium text-foreground hover:text-accent"
                   >
                     {task.title}
                   </Link>
                   <div className="flex items-center gap-2 text-xs">
-                    {task.courseCode && <span className="text-slate-500">{task.courseCode}</span>}
+                    {task.courseCode && <span className="font-mono text-[10px] tracking-wider text-accent">{task.courseCode}</span>}
                     <span className={URGENCY_STYLES[urgency]}>
                       {dueDateLabel(task.dueDate, urgency)}
                     </span>

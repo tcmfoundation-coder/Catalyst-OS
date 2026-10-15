@@ -8,31 +8,31 @@ export interface RecentMemoryData {
 }
 
 const CATEGORY_STYLES: Record<MemoryCategory, string> = {
-  insight: "bg-emerald-50 text-emerald-700",
-  difficulty: "bg-red-50 text-red-700",
-  preference: "bg-sky-50 text-sky-700",
-  reminder: "bg-amber-50 text-amber-700",
-  general: "bg-slate-100 text-slate-600",
+  insight: "bg-accent/10 text-accent",
+  difficulty: "bg-danger/10 text-danger",
+  preference: "bg-sky-400/10 text-sky-300",
+  reminder: "bg-caution/10 text-caution",
+  general: "bg-surface-raised text-muted",
 };
 
 export function RecentMemoriesWidget({ memories }: { memories: RecentMemoryData[] }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6">
+    <section className="hud-panel rounded-2xl p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-900">Recent memories</h2>
+        <h2 className="text-sm font-semibold text-foreground">Memory archive</h2>
         <Link
           href="/dashboard/memories"
-          className="text-sm font-medium text-indigo-600 hover:underline"
+          className="text-xs font-medium text-accent hover:underline"
         >
           View all
         </Link>
       </div>
       {memories.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Nothing jotted down yet.{" "}
           <Link
             href="/dashboard/memories/new"
-            className="font-medium text-indigo-600 hover:underline"
+            className="font-medium text-accent hover:underline"
           >
             Write your first memory
           </Link>
@@ -43,14 +43,14 @@ export function RecentMemoriesWidget({ memories }: { memories: RecentMemoryData[
           {memories.map((memory) => (
             <div
               key={memory.id}
-              className="border-b border-slate-100 pb-3 last:border-0 last:pb-0"
+              className="border-b border-line/70 pb-3 last:border-0 last:pb-0"
             >
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_STYLES[memory.category]}`}
               >
                 {MEMORY_CATEGORY_LABELS[memory.category]}
               </span>
-              <p className="mt-1 line-clamp-2 text-sm text-slate-700">{memory.content}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-muted">{memory.content}</p>
             </div>
           ))}
         </div>

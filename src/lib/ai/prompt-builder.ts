@@ -84,7 +84,7 @@ function renderAcademicContext(context: AIContext["academicContext"]): string | 
     lines.push("Upcoming tasks:");
     for (const task of context.upcomingTasks) {
       const dueSuffix = task.dueDate ? ` (due ${task.dueDate})` : "";
-      lines.push(`  - ${task.title}${dueSuffix} [${task.priority}]`);
+      lines.push(`  - ${task.title}${dueSuffix} [${task.priority}] (task ID: ${escapeForXmlLikeTag(task.id)})`);
     }
   }
   if (context.recentMemories?.length) {

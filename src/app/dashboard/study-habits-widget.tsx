@@ -12,20 +12,20 @@ export function StudyHabitsWidget({
   totalHabits: number;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h2 className="mb-4 text-base font-semibold text-slate-900">Study &amp; habits</h2>
+    <section className="hud-panel rounded-2xl p-5 sm:p-6">
+      <h2 className="mb-4 text-sm font-semibold text-foreground">Focus telemetry</h2>
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <p className="text-xs font-medium text-slate-400">Study today</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{studyToday}</p>
+          <p className="text-xs font-medium text-muted">Study today</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{studyToday}</p>
         </div>
         <div>
-          <p className="text-xs font-medium text-slate-400">This week</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{studyThisWeek}</p>
+          <p className="text-xs font-medium text-muted">This week</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{studyThisWeek}</p>
         </div>
         <div>
-          <p className="text-xs font-medium text-slate-400">Habits today</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
+          <p className="text-xs font-medium text-muted">Habits today</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
             {totalHabits === 0 ? "—" : `${habitsCompletedToday}/${totalHabits}`}
           </p>
         </div>
@@ -33,11 +33,11 @@ export function StudyHabitsWidget({
       <div className="mt-4 flex gap-4 text-sm">
         <Link
           href="/dashboard/study-sessions"
-          className="font-medium text-indigo-600 hover:underline"
+          className="font-medium text-accent hover:underline"
         >
           Log study time
         </Link>
-        <Link href="/dashboard/habits" className="font-medium text-indigo-600 hover:underline">
+        <Link href="/dashboard/habits" className="font-medium text-accent hover:underline">
           View habits
         </Link>
       </div>

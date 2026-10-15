@@ -2,6 +2,8 @@
 <CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
   <CORSRule>
     <AllowedOrigin>http://localhost:3000</AllowedOrigin>
+    <AllowedOrigin>http://localhost:8082</AllowedOrigin>
+    <AllowedOrigin>http://127.0.0.1:8082</AllowedOrigin>
     <AllowedMethod>PUT</AllowedMethod>
     <AllowedMethod>GET</AllowedMethod>
     <AllowedMethod>HEAD</AllowedMethod>

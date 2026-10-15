@@ -143,6 +143,17 @@ describe("buildPrompt", () => {
     expect(userInput.indexOf("MTH101")).toBeLessThan(appEnd);
   });
 
+  it("includes escaped task IDs so structured recommendations can reference only listed tasks", () => {
+    const context = baseContext({
+      academicContext: {
+        upcomingTasks: [{ id: "task-<123>", title: "Finish essay", dueDate: "2026-10-16T00:00:00.000Z", priority: "high" }],
+      },
+    });
+    const { userInput } = buildPrompt(context);
+    expect(userInput).toContain("task ID: task-&lt;123&gt;");
+    expect(userInput).toContain("Finish essay (due 2026-10-16T00:00:00.000Z) [high]");
+  });
+
   it("omits <application_context> entirely when no academic context is given", () => {
     const { userInput } = buildPrompt(baseContext({ academicContext: null }));
     expect(userInput).not.toContain("<application_context>");

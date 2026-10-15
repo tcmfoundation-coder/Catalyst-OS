@@ -10,6 +10,24 @@ import {
   type StructuredLLMGenerationResult,
 } from "./llm-provider";
 
+const DEFAULT_REASONING_EFFORT = "high";
+const REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+function getModel(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_LLM_MODEL;
+}
+
+function getReasoningEffort(): ReasoningEffort {
+  const effort = process.env.ANTHROPIC_EFFORT?.trim() || DEFAULT_REASONING_EFFORT;
+  if ((REASONING_EFFORTS as readonly string[]).includes(effort)) return effort as ReasoningEffort;
+  throw new LLMProviderError(`Invalid ANTHROPIC_EFFORT "${effort}". Use low, medium, high, xhigh, or max.`);
+}
+
+function getOutputConfig(): { effort: ReasoningEffort } {
+  return { effort: getReasoningEffort() };
+}
+
 /**
  * The only file allowed to import @anthropic-ai/sdk. Structured output
  * uses Anthropic's forced tool-use technique (a synthetic tool whose
@@ -55,8 +73,9 @@ export class AnthropicProvider implements LLMProvider {
     const client = getClient();
     try {
       const response = await client.messages.create({
-        model: request.model ?? DEFAULT_LLM_MODEL,
+        model: request.model ?? getModel(),
         max_tokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        output_config: getOutputConfig(),
         system: request.systemInstructions,
         messages: [{ role: "user", content: request.userInput }],
         ...temperatureParam(request.temperature),
@@ -83,8 +102,9 @@ export class AnthropicProvider implements LLMProvider {
     const client = getClient();
     try {
       const response = await client.messages.create({
-        model: request.model ?? DEFAULT_LLM_MODEL,
+        model: request.model ?? getModel(),
         max_tokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        output_config: getOutputConfig(),
         system: request.systemInstructions,
         messages: [{ role: "user", content: request.userInput }],
         tools: [

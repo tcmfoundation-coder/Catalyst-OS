@@ -21,6 +21,9 @@ export const TutorRequestSchema = z.object({
   materialId: z.string().optional(),
   courseId: z.string().optional(),
   conversationId: z.string().optional(),
+  includeAcademicContext: z.boolean().optional(),
+  includeUpcomingTasks: z.boolean().optional(),
+  includeRecentMemories: z.boolean().optional(),
 });
 export type TutorRequest = z.infer<typeof TutorRequestSchema>;
 

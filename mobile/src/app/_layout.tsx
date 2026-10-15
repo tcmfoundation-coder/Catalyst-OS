@@ -1,15 +1,23 @@
 import { Stack } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-
-const colors = { background: "#080B10", foreground: "#E6EDF2", muted: "#8495A2", accent: "#A5F34B" };
+import { SettingsProvider } from "@/lib/settings-context";
+import { ToastProvider } from "@/components/ui/ToastProvider";
+import { TactilePressable } from "@/components/ui/TactilePressable";
+import { CatalystBrand } from "@/components/brand/CatalystBrand";
+import { CatalystOrb } from "@/components/brand/CatalystOrb";
+import { colors, space } from "@/theme/tokens";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <SettingsProvider>
+          <RootNavigator />
+        </SettingsProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
@@ -18,22 +26,26 @@ function RootNavigator() {
 
   if (state.status === "loading") {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} />
-        <Text style={styles.muted}>Restoring your session…</Text>
+      <View style={styles.startup}>
+        <CatalystBrand />
+        <CatalystOrb state="thinking" size={190} />
+        <Text style={styles.eyebrow}>SECURE SESSION <Text style={styles.slash}>/</Text> RESTORING</Text>
+        <ActivityIndicator color={colors.lime} />
       </View>
     );
   }
 
   if (state.status === "offline") {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.brand}>CATALYSTS</Text>
+      <SafeAreaView style={styles.offline}>
+        <CatalystBrand />
+        <CatalystOrb state="alert" size={172} motionEnabled={false} />
+        <Text style={styles.eyebrowAmber}>CORE CONNECTION <Text style={styles.slash}>/</Text> OFFLINE</Text>
         <Text style={styles.title}>Connection unavailable</Text>
         <Text style={styles.muted}>Reconnect to the Catalysts API to restore your session.</Text>
-        <Pressable style={styles.button} onPress={() => void retryRestore()}>
-          <Text style={styles.buttonText}>Retry connection</Text>
-        </Pressable>
+        <TactilePressable style={styles.button} onPress={() => void retryRestore()}>
+          <Text style={styles.buttonText}>Retry connection <Text>→</Text></Text>
+        </TactilePressable>
       </SafeAreaView>
     );
   }
@@ -42,7 +54,10 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Protected guard={isAuthenticated}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="academic" />
+        <Stack.Screen name="materials" />
+        <Stack.Screen name="study-notes" />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="sign-in" />
@@ -52,10 +67,13 @@ function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 28, backgroundColor: colors.background },
-  brand: { color: colors.accent, fontSize: 12, fontWeight: "700", letterSpacing: 4 },
-  title: { color: colors.foreground, fontSize: 23, fontWeight: "700", textAlign: "center" },
-  muted: { color: colors.muted, fontSize: 14, textAlign: "center" },
-  button: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 13, borderRadius: 10, backgroundColor: colors.accent },
-  buttonText: { color: colors.background, fontSize: 14, fontWeight: "700" },
+  startup: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: colors.background },
+  offline: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.xxl, backgroundColor: colors.background },
+  eyebrow: { color: colors.lime, fontSize: 9, fontWeight: "800", letterSpacing: 1.5 },
+  eyebrowAmber: { color: colors.amber, fontSize: 9, fontWeight: "800", letterSpacing: 1.5 },
+  slash: { color: colors.subtle },
+  title: { color: colors.foreground, fontSize: 22, fontWeight: "700", textAlign: "center", marginTop: space.xs },
+  muted: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 300 },
+  button: { marginTop: space.md, paddingHorizontal: space.xl, paddingVertical: 13, borderRadius: 13, backgroundColor: colors.lime, borderTopColor: "#D4FF9A", borderBottomColor: "#79A83C" },
+  buttonText: { color: colors.black, fontSize: 13, fontWeight: "800" },
 });
