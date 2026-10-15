@@ -18,10 +18,22 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleSignIn() {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password.trim()) {
+      const message = !normalizedEmail && !password.trim()
+        ? "Enter your email address and password."
+        : !normalizedEmail
+          ? "Enter your email address."
+          : "Enter your password.";
+      setError(message);
+      showToast(message, "error");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      await signIn(normalizedEmail, password);
       showToast("Welcome back");
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Sign in failed. Try again.";
@@ -34,8 +46,13 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.screen}>
             <View style={styles.topLine}>
               <CatalystBrand />
@@ -63,8 +80,12 @@ export default function SignInScreen() {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect={false}
+                  accessibilityHint="Required"
                   keyboardType="email-address"
-                  onChangeText={setEmail}
+                  onChangeText={(value) => {
+                    setEmail(value);
+                    setError(null);
+                  }}
                   placeholder="you@example.com"
                   placeholderTextColor={colors.muted}
                   returnKeyType="next"
@@ -80,7 +101,11 @@ export default function SignInScreen() {
                   accessibilityLabel="Password"
                   autoCapitalize="none"
                   autoComplete="current-password"
-                  onChangeText={setPassword}
+                  accessibilityHint="Required"
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    setError(null);
+                  }}
                   onSubmitEditing={() => void handleSignIn()}
                   placeholder="Enter your password"
                   placeholderTextColor={colors.muted}

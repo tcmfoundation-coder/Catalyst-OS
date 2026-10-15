@@ -222,7 +222,7 @@ export default function AssistantScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.screen}>
           <View style={styles.header}>
             <View><Text style={styles.eyebrow}>CATALYST CORE <Text style={styles.dim}>/ TUTOR</Text></Text><Text style={styles.title}>Your assistant</Text></View>
@@ -251,7 +251,15 @@ export default function AssistantScreen() {
               <View style={styles.voiceCopy}><Text style={[styles.voiceLabel, listening && styles.voiceActive]}>{voiceLabel}</Text><Text numberOfLines={2} style={styles.transcript}>{transcript || (listening ? "Listening for your question…" : "Tap the Core to ask another question")}</Text></View>
               <Text style={styles.voiceChevron}>{speaking ? "Ⅱ" : listening ? "■" : "↗"}</Text>
             </TactilePressable>
-            <ScrollView ref={scrollRef} style={styles.messages} contentContainerStyle={styles.messageList} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              ref={scrollRef}
+              style={styles.messages}
+              contentContainerStyle={styles.messageList}
+              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+            >
               {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
               {asking ? <View style={styles.thinking}><CatalystOrb state="thinking" size={66} /><Text style={styles.thinkingText}>Working through your question…</Text></View> : null}
             </ScrollView>

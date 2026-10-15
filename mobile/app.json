@@ -8,15 +8,24 @@
     "scheme": "catalysts",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow Catalysts to turn your spoken questions into text.",
+        "NSMicrophoneUsageDescription": "Allow Catalysts to listen when you tap the Catalyst Core."
+      }
     },
     "android": {
+      "package": "com.tcmfoundation.catalysts",
       "adaptiveIcon": {
         "backgroundColor": "#070B10",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",
@@ -54,6 +63,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b274c57b-9dc5-4d01-adb4-1192b0e663fd"
+      }
+    },
+    "owner": "muktar001"
   }
 }

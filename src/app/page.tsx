@@ -59,6 +59,15 @@ export default function Home() {
               >
                 Sign in
               </Link>
+              <a
+                href="https://expo.dev/accounts/muktar001/projects/catalysts/builds/2775a084-6e26-43e2-84a8-67204c484bfc"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-14 items-center justify-center gap-2 rounded-xl border border-[#b5f36f]/30 bg-[#b5f36f]/[0.06] px-5 text-sm font-semibold text-[#c5ff82] transition hover:border-[#b5f36f]/60 hover:bg-[#b5f36f]/[0.12] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b5f36f]"
+              >
+                Download Android app
+                <span aria-hidden="true">↗</span>
+              </a>
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -181,7 +181,13 @@ export default function CreateScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
         <Text style={styles.eyebrow}>ACADEMIC SYSTEM <Text style={styles.dim}>/ CREATE</Text></Text>
         <Text style={styles.title}>{taskId ? "Edit your task" : "Add to your system"}</Text>
         <Text style={styles.subtitle}>{taskId ? "Update the details and deadline for this task." : "Saved items are attached to your Catalysts account."}</Text>
@@ -240,6 +246,7 @@ export default function CreateScreen() {
         </HudPanel>
         <Text style={styles.footer}>Data is validated and saved through Catalysts Core.</Text>
       </ScrollView>
+      </KeyboardAvoidingView>
       <Modal
         transparent
         animationType="slide"
@@ -314,6 +321,7 @@ function ChoiceRow({ values, selected, onSelect }: { values: string[]; selected:
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   content: { width: "100%", maxWidth: 760, alignSelf: "center", padding: space.xl, paddingTop: space.lg, paddingBottom: 112, gap: space.md },
   eyebrow: { color: colors.lime, fontSize: 9, fontWeight: "800", letterSpacing: 1.35 },
   dim: { color: colors.subtle },
