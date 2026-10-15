@@ -3,11 +3,13 @@ import { isRunningInExpoGo } from "expo";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Platform } from "react-native";
 import { useAuth } from "@/lib/auth-context";
+import { disableServerPush } from "@/lib/push-notifications";
 
 export interface AppSettings {
   notifications: {
     studyReminder: { enabled: boolean; time: string };
     taskReminder: { enabled: boolean; time: string };
+    serverPush: { enabled: boolean };
   };
   weeklyStudyGoalHours: number;
   reduceMotion: boolean;
@@ -17,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notifications: {
     studyReminder: { enabled: false, time: "18:00" },
     taskReminder: { enabled: false, time: "09:00" },
+    serverPush: { enabled: false },
   },
   weeklyStudyGoalHours: 5,
   reduceMotion: false,
@@ -75,14 +78,17 @@ async function readSettings(userId: string): Promise<AppSettings> {
 
   const parsed: unknown = JSON.parse(stored);
   if (!parsed || typeof parsed !== "object") throw new Error("Saved settings are invalid. Reset them to continue.");
-  const value = parsed as Partial<AppSettings>;
+  const value = parsed as Partial<AppSettings> & {
+    notifications?: Partial<AppSettings["notifications"]>;
+  };
+  const notifications = { ...DEFAULT_SETTINGS.notifications, ...value.notifications };
   const validTime = (time: unknown) => typeof time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   if (
-    !value.notifications ||
-    typeof value.notifications.studyReminder?.enabled !== "boolean" ||
-    !validTime(value.notifications.studyReminder.time) ||
-    typeof value.notifications.taskReminder?.enabled !== "boolean" ||
-    !validTime(value.notifications.taskReminder.time) ||
+    typeof notifications.studyReminder?.enabled !== "boolean" ||
+    !validTime(notifications.studyReminder.time) ||
+    typeof notifications.taskReminder?.enabled !== "boolean" ||
+    !validTime(notifications.taskReminder.time) ||
+    typeof notifications.serverPush?.enabled !== "boolean" ||
     typeof value.weeklyStudyGoalHours !== "number" ||
     !Number.isInteger(value.weeklyStudyGoalHours) ||
     value.weeklyStudyGoalHours < 1 ||
@@ -91,7 +97,11 @@ async function readSettings(userId: string): Promise<AppSettings> {
   ) {
     throw new Error("Saved settings are invalid. Reset them to continue.");
   }
-  return value as AppSettings;
+  return {
+    ...DEFAULT_SETTINGS,
+    ...value,
+    notifications,
+  };
 }
 
 async function writeSettings(userId: string, settings: AppSettings) {
@@ -220,12 +230,15 @@ export function SettingsProvider({ children }: PropsWithChildren) {
 
   const resetSettings = useCallback(async () => {
     if (!userId) throw new Error("Sign in before resetting settings.");
+    if (record?.userId === userId && record.settings.notifications.serverPush.enabled && state.status === "authenticated") {
+      await disableServerPush(state.token);
+    }
     await syncReminderNotifications(DEFAULT_SETTINGS.notifications);
     const key = storageKey(userId);
     if (Platform.OS === "web") window.localStorage.removeItem(key);
     else await SecureStore.deleteItemAsync(key);
     setRecord({ userId, settings: DEFAULT_SETTINGS, error: null });
-  }, [userId]);
+  }, [record, state, userId]);
 
   const updateSettings = useCallback(async (
     patch: Partial<Omit<AppSettings, "notifications">> & {

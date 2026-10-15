@@ -58,7 +58,8 @@
           "microphonePermission": "Allow Catalysts to listen when you tap the Catalyst Core.",
           "speechRecognitionPermission": "Allow Catalysts to turn your spoken questions into text."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

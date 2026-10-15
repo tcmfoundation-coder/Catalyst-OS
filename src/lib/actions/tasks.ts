@@ -8,6 +8,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Task } from "@/models/Task";
 import { TaskInputSchema, TaskStatusInputSchema } from "@/lib/tasks/validation";
 import { nextCompletedAt } from "@/lib/tasks/lifecycle";
+import { notifyTaskChange } from "@/lib/mobile/push-notifications";
 import { courseBelongsToUser } from "./course-ownership";
 
 export type ActionState = { error?: string } | undefined;
@@ -39,7 +40,7 @@ export async function createTask(_prevState: ActionState, formData: FormData): P
     return { error: "Course not found" };
   }
 
-  await Task.create({
+  const task = await Task.create({
     userId,
     courseId: courseId ? new Types.ObjectId(courseId) : null,
     title,
@@ -50,6 +51,7 @@ export async function createTask(_prevState: ActionState, formData: FormData): P
     dueDate: dueDate ? new Date(dueDate) : null,
     completedAt: null,
   });
+  await notifyTaskChange(userId, "New task", task.title, task._id.toString());
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard");
@@ -86,15 +88,25 @@ export async function updateTask(
     return { error: "Course not found" };
   }
 
+  const changed = task.title !== title
+    || task.description !== (description || null)
+    || task.type !== type
+    || task.priority !== priority
+    || task.dueDate?.toISOString() !== (dueDate ? new Date(dueDate).toISOString() : undefined)
+    || task.courseId?.toString() !== (courseId || undefined)
+    || task.status !== statusParsed.data.status;
   task.title = title;
   task.description = description || null;
   task.type = type;
   task.priority = priority;
   task.dueDate = dueDate ? new Date(dueDate) : null;
   task.courseId = courseId ? new Types.ObjectId(courseId) : null;
-  task.completedAt = nextCompletedAt(statusParsed.data.status, task.status, task.completedAt);
-  task.status = statusParsed.data.status;
-  await task.save();
+  if (changed) {
+    task.completedAt = nextCompletedAt(statusParsed.data.status, task.status, task.completedAt);
+    task.status = statusParsed.data.status;
+    await task.save();
+    await notifyTaskChange(userId, "Task updated", task.title, task._id.toString());
+  }
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard");
@@ -105,7 +117,8 @@ export async function deleteTask(taskId: string): Promise<void> {
   const userId = await requireUserId();
   await connectToDatabase();
 
-  await Task.findOneAndDelete({ _id: taskId, userId });
+  const task = await Task.findOneAndDelete({ _id: taskId, userId });
+  if (task) await notifyTaskChange(userId, "Task deleted", task.title, task._id.toString());
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard");
@@ -118,9 +131,13 @@ export async function completeTask(taskId: string): Promise<void> {
   const task = await Task.findOne({ _id: taskId, userId });
   if (!task) return;
 
+  const changed = task.status !== "completed";
   task.completedAt = nextCompletedAt("completed", task.status, task.completedAt);
   task.status = "completed";
-  await task.save();
+  if (changed) {
+    await task.save();
+    await notifyTaskChange(userId, "Task completed", task.title, task._id.toString());
+  }
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard");
@@ -133,9 +150,13 @@ export async function reopenTask(taskId: string): Promise<void> {
   const task = await Task.findOne({ _id: taskId, userId });
   if (!task) return;
 
+  const changed = task.status !== "todo";
   task.status = "todo";
   task.completedAt = null;
-  await task.save();
+  if (changed) {
+    await task.save();
+    await notifyTaskChange(userId, "Task reopened", task.title, task._id.toString());
+  }
 
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard");

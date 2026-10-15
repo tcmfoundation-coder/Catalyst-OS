@@ -6,6 +6,8 @@ import { Task } from "@/models/Task";
 import { TaskInputSchema } from "@/lib/tasks/validation";
 import { courseBelongsToUser } from "@/lib/actions/course-ownership";
 import { mobileApiHeaders, mobileApiOptions } from "@/lib/mobile/cors";
+import { mobileMutationObjectId, readMobileMutationId } from "@/lib/mobile/mutation-id";
+import { notifyTaskChange } from "@/lib/mobile/push-notifications";
 
 export function OPTIONS(request: Request) {
   return mobileApiOptions(request);
@@ -44,6 +46,10 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid task" }, { status: 400, headers });
   }
+  const mutationId = readMobileMutationId(request);
+  if (mutationId === false) {
+    return NextResponse.json({ error: "Invalid mutation id" }, { status: 400, headers });
+  }
 
   await connectToDatabase();
   const input = parsed.data;
@@ -51,17 +57,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Course not found" }, { status: 400, headers });
   }
 
-  const task = await Task.create({
+  const taskValues = {
     userId: principal.userId,
     courseId: input.courseId ? new Types.ObjectId(input.courseId) : null,
     title: input.title,
     description: input.description || null,
     type: input.type,
     priority: input.priority,
-    status: "todo",
+    status: "todo" as const,
     dueDate: input.dueDate ? new Date(input.dueDate) : null,
     completedAt: null,
-  });
+  };
+  let task = mutationId
+    ? await Task.findOne({ _id: mobileMutationObjectId(mutationId), userId: principal.userId })
+    : null;
+  if (!task) {
+    let created = false;
+    try {
+      task = await Task.create({ _id: mobileMutationObjectId(mutationId), ...taskValues });
+      created = true;
+    } catch (error) {
+      if (!mutationId || !(error && typeof error === "object" && "code" in error && error.code === 11000)) throw error;
+      task = await Task.findOne({ _id: mobileMutationObjectId(mutationId), userId: principal.userId });
+      if (!task) throw error;
+    }
+    if (created && mutationId && task) {
+      await notifyTaskChange(
+        principal.userId,
+        "New task",
+        task.title,
+        task._id.toString(),
+        request.headers.get("x-catalysts-device-token"),
+      );
+    }
+  }
 
   return NextResponse.json({ id: task._id.toString(), title: task.title, status: task.status }, { status: 201, headers });
 }

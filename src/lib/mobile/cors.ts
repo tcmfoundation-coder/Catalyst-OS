@@ -9,8 +9,8 @@ export function mobileApiHeaders(request: Request): Headers {
 
   if (origin && LOCAL_WEB_ORIGIN.test(origin)) {
     headers.set("Access-Control-Allow-Origin", origin);
-    headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Catalysts-Mutation-Id, X-Catalysts-Device-Token");
     headers.set("Access-Control-Max-Age", "600");
   }
 

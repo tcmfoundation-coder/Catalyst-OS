@@ -20,6 +20,15 @@ The URL must be reachable from the device running the app. On a physical Android
 
 Mobile screen guards improve navigation but are not a security boundary. The API validates every token and scopes every data query to its associated user.
 
+## Offline use and notifications
+
+- On Android and iOS, successful authenticated GET responses are cached in a per-account SQLite database. Session tokens remain in secure device storage, not SQLite.
+- Task edits and deletions, task/study-session/habit/memory creates, and selected academic updates can be queued while offline. The sync banner reports pending or failed changes; reconnect to retry. Queued create requests use stable mutation IDs so reconnect retries do not create duplicate records.
+- Reads not previously loaded on this device have no offline copy. Tutor/AI requests, uploads, generated notes, sign-in, and other server-dependent actions still require a network connection. The browser build does not use the native SQLite queue.
+- Daily study/task reminders are scheduled locally. Enabling the daily task reminder also schedules local reminders for the next 50 upcoming task due dates, using the selected reminder time.
+- Cross-device alerts are opt-in under **Profile & settings → Notifications**. Task creates, edits, and deletions notify the user's other registered devices; the device that made the change is excluded. Notification registration and delivery require a network connection and a physical development/production build. Expo Go does not support this remote-push setup.
+- Configure Android push credentials for the Expo project before expecting device delivery. If Expo push access tokens are enabled for the project, set the matching `EXPO_ACCESS_TOKEN` on the Catalysts server. The app must be rebuilt after adding native modules or changing Expo notification configuration.
+
 ## Commands
 
 ```bash
@@ -27,6 +36,10 @@ npx expo start
 npx expo lint
 npx tsc --noEmit
 ```
+
+In Windows PowerShell with script execution restricted, use the command shims
+instead (for example, `npx.cmd expo start` or
+`npx.cmd eas-cli@latest build --platform android --profile preview`).
 
 ## Install a personal Android build
 

@@ -9,6 +9,8 @@ import { TactileIconTile, TactilePressable } from "@/components/ui/TactilePressa
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/lib/auth-context";
 import { useAppSettings } from "@/lib/settings-context";
+import { useOfflineSync } from "@/lib/offline-sync-context";
+import { disableServerPush, enableServerPush } from "@/lib/push-notifications";
 import { colors, radius, space } from "@/theme/tokens";
 
 type ReminderKey = "studyReminder" | "taskReminder";
@@ -26,6 +28,7 @@ function toTimeValue(date: Date) {
 export default function ProfileScreen() {
   const { state, signOut } = useAuth();
   const { showToast } = useToast();
+  const { online } = useOfflineSync();
   const { settings, loading: settingsLoading, error: settingsError, retryLoad, resetSettings, updateSettings } = useAppSettings();
   const [signingOut, setSigningOut] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +60,32 @@ export default function ProfileScreen() {
       showToast(successMessage);
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : "Could not save settings.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleServerPush(enabled: boolean) {
+    if (state.status !== "authenticated") return;
+    setSaving(true);
+    try {
+      if (enabled) {
+        await enableServerPush(state.token);
+        try {
+          await updateSettings({ notifications: { serverPush: { enabled: true } } });
+        } catch (cause) {
+          await disableServerPush(state.token).catch((cleanupError: unknown) => {
+            console.error("Could not undo push registration after the setting failed to save", cleanupError);
+          });
+          throw cause;
+        }
+      } else {
+        await disableServerPush(state.token);
+        await updateSettings({ notifications: { serverPush: { enabled: false } } });
+      }
+      showToast(enabled ? "Cross-device notifications enabled" : "Cross-device notifications disabled");
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : "Could not update push notifications.", "error");
     } finally {
       setSaving(false);
     }
@@ -101,7 +130,12 @@ export default function ProfileScreen() {
           <View style={styles.identityCopy}>
             <Text style={styles.name}>{state.user.name}</Text>
             <Text style={styles.email}>{state.user.email}</Text>
-            <View style={styles.online}><View style={styles.dot} /><Text style={styles.onlineText}>ACCOUNT CONNECTED</Text></View>
+            <View style={styles.online}>
+              <View style={[styles.dot, !online && styles.offlineDot]} />
+              <Text style={[styles.onlineText, !online && styles.offlineText]}>
+                {online ? "ACCOUNT CONNECTED" : "OFFLINE · LOCAL SESSION"}
+              </Text>
+            </View>
           </View>
           <View style={styles.orb}><CatalystOrb state="idle" size={52} /></View>
         </HudPanel>
@@ -131,7 +165,7 @@ export default function ProfileScreen() {
               <View style={styles.reminderRow}>
                 <View style={styles.reminderCopy}>
                   <Text style={styles.settingTitle}>Task check-in</Text>
-                  <Text style={styles.settingHint}>A daily reminder to review your upcoming tasks.</Text>
+                  <Text style={styles.settingHint}>A daily task check-in and local alerts for upcoming due dates.</Text>
                   <ReminderTime time={settings.notifications.taskReminder.time} disabled={saving} onPress={() => openTimePicker("taskReminder")} />
                 </View>
                 <Switch
@@ -143,10 +177,25 @@ export default function ProfileScreen() {
                   thumbColor={settings.notifications.taskReminder.enabled ? colors.cyan : "#A8B4BA"}
                 />
               </View>
+              <View style={styles.separator} />
+              <View style={styles.reminderRow}>
+                <View style={styles.reminderCopy}>
+                  <Text style={styles.settingTitle}>Cross-device alerts</Text>
+                  <Text style={styles.settingHint}>Receive task updates from your other devices while this app is closed.</Text>
+                </View>
+                <Switch
+                  accessibilityLabel="Cross-device push notifications"
+                  value={settings.notifications.serverPush.enabled}
+                  disabled={saving || runningInExpoGo || Platform.OS === "web"}
+                  onValueChange={(enabled) => void toggleServerPush(enabled)}
+                  trackColor={{ false: "#34434C", true: `${colors.cyan}88` }}
+                  thumbColor={settings.notifications.serverPush.enabled ? colors.cyan : "#A8B4BA"}
+                />
+              </View>
               <Text style={runningInExpoGo ? styles.reminderNotice : styles.footnote}>
                 {runningInExpoGo
-                  ? "Scheduled reminders need a Catalyst development build with the notifications module. The rest of the app works in Expo Go."
-                  : "Reminders are scheduled on this device and follow its local time. They are not server push notifications."}
+                  ? "Local and remote notifications need a Catalyst development or production build. The rest of the app works in Expo Go."
+                  : "Daily reminders and task due alerts are scheduled on this device. Cross-device alerts use Expo Push and require an internet connection."}
               </Text>
             </>
           )}
@@ -303,6 +352,8 @@ const styles = StyleSheet.create({
   online: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
   dot: { width: 6, height: 6, borderRadius: 4, backgroundColor: colors.lime },
   onlineText: { color: colors.lime, fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  offlineDot: { backgroundColor: colors.amber },
+  offlineText: { color: colors.amber },
   orb: { width: 54, height: 54, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   sectionHeading: { gap: 3, marginTop: space.xs },
   sectionEyebrow: { color: colors.cyan, fontSize: 8, fontWeight: "800", letterSpacing: 1.3 },
