@@ -58,6 +58,31 @@ API URL and run Expo.
 
 5. Open [http://localhost:3000](http://localhost:3000).
 
+## Docker
+
+The production container runs the Next.js web/API app and its Python document
+processor. Docker Compose also starts MongoDB and keeps its data, the vector
+index, and downloaded embedding models in named volumes.
+
+1. Copy `.env.docker.example` to `.env.docker` and set unique,
+   URL-safe `MONGO_INITDB_ROOT_PASSWORD` and `NEXTAUTH_SECRET` values. Add
+   S3-compatible storage credentials to enable study material uploads, and an
+   `ANTHROPIC_API_KEY` to enable AI responses.
+2. Build and start the app:
+
+   ```bash
+   docker compose --env-file .env.docker up --build -d
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000). Stop the services with
+   `docker compose down`; MongoDB and model/index data remain in their named
+   volumes. Use `docker compose down -v` only when you intend to delete that
+   persisted data.
+
+The image is built for production, listens on port 3000, and runs as a
+non-root user. The Expo mobile client is not included; it runs separately
+using the instructions in `mobile/README.md`.
+
 ## Scripts
 
 - `npm run dev` — start the dev server
