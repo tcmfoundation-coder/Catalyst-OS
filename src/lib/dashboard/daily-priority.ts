@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { connectToDatabase } from "@/lib/db";
+import { getUserLLMProvider } from "@/lib/ai/user-provider";
 import { askStructured } from "@/lib/ai/orchestrator";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import { Task } from "@/models/Task";
@@ -71,7 +72,7 @@ export async function recommendDailyPriority(
     DAILY_PRIORITY_SCHEMA,
     "daily_priority",
     {
-      llmProvider: deps.llmProvider,
+      llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId),
       roleInstructions: DAILY_PRIORITY_INSTRUCTIONS,
     },
   );

@@ -1,7 +1,7 @@
 import "server-only";
 import type { ZodType } from "zod";
 import { getMaterialCoverage } from "@/lib/retrieval/service";
-import { getLLMProvider } from "./anthropic-provider";
+import { getLLMProvider } from "./provider-factory";
 import { build } from "./context-assembler";
 import { RESOURCE_GENERATION_MAX_OUTPUT_TOKENS, RESOURCE_RETRIEVAL_POLICY } from "./constants";
 import type { LLMProvider } from "./llm-provider";

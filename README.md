@@ -66,8 +66,8 @@ index, and downloaded embedding models in named volumes.
 
 1. Copy `.env.docker.example` to `.env.docker` and set unique,
    URL-safe `MONGO_INITDB_ROOT_PASSWORD` and `NEXTAUTH_SECRET` values. Add
-   S3-compatible storage credentials to enable study material uploads, and an
-   `ANTHROPIC_API_KEY` to enable AI responses.
+   S3-compatible storage credentials to enable study material uploads, and a
+   supported AI provider key to enable AI responses.
 2. Build and start the app:
 
    ```bash
@@ -118,8 +118,17 @@ Optional integrations:
   study-material file storage. `S3_REGION` defaults to `us-east-1`;
   `S3_ENDPOINT` is only needed for S3-compatible providers other than AWS, and
   `S3_FORCE_PATH_STYLE` defaults to `false`.
-- Set `ANTHROPIC_API_KEY` to enable AI responses. `ANTHROPIC_MODEL` and
-  `ANTHROPIC_EFFORT` are optional and default in the application.
+- Set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` to use Gemini. The default
+  test model is `gemini-3.8-flash`; `GEMINI_MODEL` and
+  `GEMINI_THINKING_LEVEL` (`low`, `medium`, or `high`) can override it. Google's
+  free-tier terms may allow submitted content to improve its products, so test
+  with synthetic or non-sensitive study material.
+- Set `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` to use Anthropic instead.
+  `ANTHROPIC_MODEL` and `ANTHROPIC_EFFORT` are optional. Provider keys remain
+  server-side and are never sent to mobile or browser clients.
+- Set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` to use OpenAI's Responses API.
+  `OPENAI_MODEL` defaults to `gpt-5-mini`; `OPENAI_REASONING_EFFORT` accepts
+  `minimal`, `low`, `medium`, or `high`. OpenAI API usage may be billed.
 
 Render's filesystem is ephemeral by default. If you want to retain the local
 vector index and downloaded embedding models between deploys, attach a
@@ -162,7 +171,7 @@ data is stored in the external database, not on this disk.
   RetrievalService, a deliberately-scoped `AcademicContextProvider`, a
   pure `ContextAssembler`, a `PromptBuilder` that enforces the trust
   boundary between application data and untrusted retrieved material, and
-  an `LLMProvider` abstraction (Anthropic implementation) — see
+  an `LLMProvider` abstraction (Anthropic, Gemini, and OpenAI implementations) — see
   `src/lib/ai/orchestrator.ts` for the full flow.
 - AI Tutor (`src/lib/tutor/`, `/dashboard/tutor`): ask a question,
   optionally scoped to a material or course, and get an answer grounded in

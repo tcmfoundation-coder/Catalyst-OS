@@ -1,5 +1,6 @@
 import "server-only";
 import { connectToDatabase } from "@/lib/db";
+import { getUserLLMProvider } from "@/lib/ai/user-provider";
 import { askStructured } from "@/lib/ai/orchestrator";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import type { AIContextSource } from "@/lib/ai/types";
@@ -70,7 +71,7 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
       sources: [],
     };
   }
-  const { question, materialId, courseId, conversationId: existingConversationId, includeAcademicContext, includeUpcomingTasks, includeRecentMemories } = parsed.data;
+  const { question, materialId, courseId, conversationId: existingConversationId, includeAcademicContext, includeUpcomingTasks, includeRecentMemories, studyMode } = parsed.data;
 
   await connectToDatabase();
 
@@ -81,6 +82,7 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
         title: deriveConversationTitle(question),
         courseId: courseId ?? null,
         materialId: materialId ?? null,
+        studyMode: studyMode ?? null,
       });
 
   if (!conversation) {
@@ -96,6 +98,11 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
     };
   }
   const conversationId = conversation._id.toString();
+  const effectiveStudyMode = studyMode ?? conversation.studyMode ?? null;
+  if (studyMode && conversation.studyMode !== studyMode) {
+    conversation.studyMode = studyMode;
+    await conversation.save();
+  }
 
   // A follow-up inherits the conversation's original scope unless this
   // specific question overrides it — so the two-pane UI's follow-up box
@@ -110,10 +117,29 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
 
   const structured = await askStructured(
     userId,
-    { question, materialId: effectiveMaterialId, courseId: effectiveCourseId, conversationContext, includeAcademicContext, includeUpcomingTasks, includeRecentMemories },
+    {
+      question,
+      materialId: effectiveMaterialId,
+      courseId: effectiveCourseId,
+      conversationContext,
+      includeAcademicContext: includeAcademicContext || effectiveStudyMode === "planning",
+      includeUpcomingTasks: includeUpcomingTasks || effectiveStudyMode === "planning",
+      includeRecentMemories,
+    },
     TutorModelOutputSchema,
     TUTOR_SCHEMA_NAME,
-    { llmProvider: deps.llmProvider, roleInstructions: TUTOR_ROLE_INSTRUCTIONS },
+    {
+      llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId),
+      roleInstructions: [
+        TUTOR_ROLE_INSTRUCTIONS,
+        effectiveStudyMode === "practice"
+          ? "Practice mode: use the selected study material when available. Ask one focused practice question at a time and do not reveal its answer until the student attempts it. After an attempt, explain what is correct or needs work, cite the supporting material when available, then ask the next question."
+          : null,
+        effectiveStudyMode === "planning"
+          ? "Study planning mode: use the supplied upcoming tasks and due dates as the source of truth. Suggest a realistic, prioritized study plan in manageable blocks. Do not invent tasks or deadlines. Make clear that suggested study blocks are proposals; the student can track completed work in Study Sessions and Tasks."
+          : null,
+      ].filter(Boolean).join("\n\n"),
+    },
   );
 
   if (!structured.ok) {

@@ -1,9 +1,9 @@
 /**
  * The app-level LLM seam. AIOrchestrator, and nothing else, depends on
- * this interface — never on an SDK directly. AnthropicProvider is the
- * only implementation today; a future ExternalLLMProvider/local-model
- * provider can be added without touching the orchestrator, ContextAssembler,
- * or PromptBuilder, exactly like EmbeddingProvider in lib/embeddings.
+ * this interface — never on an SDK directly. Provider implementations
+ * implement this contract without changing the orchestrator,
+ * ContextAssembler, or PromptBuilder, exactly like EmbeddingProvider in
+ * lib/embeddings.
  */
 
 export interface LLMGenerationRequest {
@@ -12,7 +12,7 @@ export interface LLMGenerationRequest {
   /** The fully-composed user turn (question + delimited context sections) built by PromptBuilder. */
   userInput: string;
   model?: string;
-  /** Generation control where the provider supports it — see anthropic-provider.ts's docstring for a real constraint discovered on the current default model. */
+  /** Optional generation control where supported by the selected provider. */
   temperature?: number;
   maxOutputTokens?: number;
 }

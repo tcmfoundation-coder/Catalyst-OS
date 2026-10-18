@@ -12,6 +12,7 @@ export interface AskParams {
   question: string;
   materialId?: string;
   courseId?: string;
+  studyMode?: "practice" | "planning";
 }
 
 interface TutorThreadProps {
@@ -61,10 +62,10 @@ export function TutorThread({
   const [materialId, setMaterialId] = useState("");
   const [courseId, setCourseId] = useState("");
 
-  function submit(text: string) {
+  function submit(text: string, studyMode?: "practice" | "planning") {
     const trimmed = text.trim();
     if (!trimmed || asking) return;
-    onAsk({ question: trimmed, materialId: materialId || undefined, courseId: courseId || undefined });
+    onAsk({ question: trimmed, materialId: materialId || undefined, courseId: courseId || undefined, studyMode });
     setQuestion("");
   }
 
@@ -77,9 +78,17 @@ export function TutorThread({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && !asking && (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
-            {isNewConversation ? "Ask a question below to start this conversation." : "Select a conversation."}
-          </div>
+          isNewConversation ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+              <p className="text-sm text-slate-500">Choose a starting point or ask your own question.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button type="button" disabled={asking} onClick={() => submit("Quiz me one question at a time on this material.", "practice")} className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-60">Practice this material</button>
+                <button type="button" disabled={asking} onClick={() => submit("Help me plan what to study next around my upcoming deadlines.", "planning")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Plan around deadlines</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">Select a conversation.</div>
+          )
         )}
 
         {messages.map((message) => (

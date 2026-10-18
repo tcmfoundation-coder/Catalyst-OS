@@ -2,7 +2,7 @@ import "server-only";
 import { z, type ZodType } from "zod";
 import { search } from "@/lib/retrieval/service";
 import { getAcademicContext } from "./academic-context";
-import { getLLMProvider } from "./anthropic-provider";
+import { getLLMProvider } from "./provider-factory";
 import { build } from "./context-assembler";
 import { RETRIEVAL_POLICY } from "./constants";
 import { type LLMProvider, type LLMUsage } from "./llm-provider";

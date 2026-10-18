@@ -17,6 +17,7 @@ const DESTINATIONS = [
   { href: "/dashboard/materials", label: "Materials" },
   { href: "/dashboard/tutor", label: "Tutor" },
   { href: "/dashboard/study-notes", label: "Study Notes" },
+  { href: "/dashboard/settings/ai", label: "AI Settings" },
 ] as const;
 
 const SIDEBAR_GROUPS = [
@@ -25,6 +26,7 @@ const SIDEBAR_GROUPS = [
   { label: "Operations", hrefs: ["/dashboard/tasks", "/dashboard/study-sessions", "/dashboard/habits"] },
   { label: "Intelligence", hrefs: ["/dashboard/memories", "/dashboard/materials"] },
   { label: "Systems", hrefs: ["/dashboard/tutor", "/dashboard/study-notes"] },
+  { label: "Preferences", hrefs: ["/dashboard/settings/ai"] },
 ] as const;
 
 const PRIMARY_HREFS = [

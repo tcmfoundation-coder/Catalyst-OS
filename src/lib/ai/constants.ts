@@ -4,7 +4,9 @@
  * number of its own. Changing behavior means changing it here.
  */
 
-export const DEFAULT_LLM_MODEL = "claude-sonnet-5";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 // Claude's output cap includes adaptive-thinking tokens as well as the
 // visible answer. Leave enough room for multi-step tutoring and structured
 // responses without forcing the model to consume the full allowance.

@@ -12,6 +12,7 @@ export interface ITutorConversation extends Document {
   title: string;
   courseId: Types.ObjectId | null;
   materialId: Types.ObjectId | null;
+  studyMode: "practice" | "planning" | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +27,9 @@ const TutorConversationSchema = new Schema<ITutorConversation>(
     // is checked once, when the conversation is created.
     courseId: { type: Schema.Types.ObjectId, ref: "Course", default: null },
     materialId: { type: Schema.Types.ObjectId, ref: "StudyMaterial", default: null },
+    // Persists the opt-in tutor workflow so follow-up turns preserve its
+    // behavior and, for planning, continue receiving the user's real tasks.
+    studyMode: { type: String, enum: ["practice", "planning", null], default: null },
   },
   { timestamps: true },
 );

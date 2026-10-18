@@ -2,6 +2,7 @@ import "server-only";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { generateStructuredResource } from "@/lib/ai/resource-generation";
+import { getUserLLMProvider } from "@/lib/ai/user-provider";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import type { AIContextSource } from "@/lib/ai/types";
 import { courseBelongsToUser } from "@/lib/actions/course-ownership";
@@ -94,7 +95,7 @@ export async function generateStudyNotes(
     { materialId, courseId, instruction: NOTES_GENERATION_REQUEST },
     StudyNotesModelOutputSchema,
     STUDY_NOTES_SCHEMA_NAME,
-    { llmProvider: deps.llmProvider, roleInstructions: NOTES_ROLE_INSTRUCTIONS },
+    { llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId), roleInstructions: NOTES_ROLE_INSTRUCTIONS },
   );
 
   if (!generated.ok) {

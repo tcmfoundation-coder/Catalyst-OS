@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
-import { DEFAULT_LLM_MODEL, DEFAULT_MAX_OUTPUT_TOKENS } from "./constants";
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_MAX_OUTPUT_TOKENS } from "./constants";
 import {
   LLMProviderError,
   type LLMGenerationRequest,
@@ -15,11 +15,10 @@ const REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 function getModel(): string {
-  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_LLM_MODEL;
+  return process.env.ANTHROPIC_MODEL?.trim() || process.env.LLM_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL;
 }
-
 function getReasoningEffort(): ReasoningEffort {
-  const effort = process.env.ANTHROPIC_EFFORT?.trim() || DEFAULT_REASONING_EFFORT;
+  const effort = process.env.ANTHROPIC_EFFORT?.trim() || process.env.LLM_REASONING_EFFORT?.trim() || DEFAULT_REASONING_EFFORT;
   if ((REASONING_EFFORTS as readonly string[]).includes(effort)) return effort as ReasoningEffort;
   throw new LLMProviderError(`Invalid ANTHROPIC_EFFORT "${effort}". Use low, medium, high, xhigh, or max.`);
 }
@@ -55,9 +54,9 @@ function getClient(): Anthropic {
 
 function describeError(error: unknown): string {
   if (error instanceof APIError) {
-    return `Anthropic API error (status ${error.status ?? "unknown"}): ${error.message}`;
+    return `Anthropic API error (status ${error.status ?? "unknown"})`;
   }
-  return error instanceof Error ? error.message : "Unknown error calling Anthropic";
+  return "Anthropic request failed. Check the server logs and provider configuration.";
 }
 
 function temperatureParam(temperature: number | undefined): { temperature: number } | Record<string, never> {
@@ -135,14 +134,4 @@ export class AnthropicProvider implements LLMProvider {
       throw new LLMProviderError(describeError(error), error);
     }
   }
-}
-
-let defaultProvider: LLMProvider | null = null;
-
-/** Factory seam: swap the implementation here to add another provider later. */
-export function getLLMProvider(): LLMProvider {
-  if (!defaultProvider) {
-    defaultProvider = new AnthropicProvider();
-  }
-  return defaultProvider;
 }

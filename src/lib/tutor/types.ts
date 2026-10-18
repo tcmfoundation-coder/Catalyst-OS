@@ -21,6 +21,7 @@ export const TutorRequestSchema = z.object({
   materialId: z.string().optional(),
   courseId: z.string().optional(),
   conversationId: z.string().optional(),
+  studyMode: z.enum(["practice", "planning"]).optional(),
   includeAcademicContext: z.boolean().optional(),
   includeUpcomingTasks: z.boolean().optional(),
   includeRecentMemories: z.boolean().optional(),

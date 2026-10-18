@@ -109,7 +109,7 @@ export function TutorShell({ materials, courses, initialConversations }: TutorSh
     }
   }
 
-  async function handleAsk({ question, materialId, courseId }: AskParams) {
+  async function handleAsk({ question, materialId, courseId, studyMode }: AskParams) {
     setAsking(true);
     setError(null);
     setFollowUpQuestion(null);
@@ -124,6 +124,7 @@ export function TutorShell({ materials, courses, initialConversations }: TutorSh
         materialId,
         courseId,
         conversationId: activeConversationId ?? undefined,
+        studyMode,
       });
 
       if (result.conversationId) {

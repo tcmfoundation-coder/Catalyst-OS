@@ -17,6 +17,7 @@ export type AskTutorInput = {
   materialId?: string;
   courseId?: string;
   conversationId?: string;
+  studyMode?: "practice" | "planning";
 };
 
 /**
