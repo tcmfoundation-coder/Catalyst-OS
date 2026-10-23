@@ -8,7 +8,7 @@ import { CatalystOrb } from "@/components/brand/CatalystOrb";
 import { HudPanel } from "@/components/ui/HudPanel";
 import { TactilePressable } from "@/components/ui/TactilePressable";
 import { useAuth } from "@/lib/auth-context";
-import { askTutor } from "@/lib/api";
+import { askTutor, getMobileAISettings, type MobileAIPreferences } from "@/lib/api";
 import { colors, radius, space } from "@/theme/tokens";
 
 type Message = { id: string; role: "user" | "assistant"; content: string; sources?: number; retrievalStatus?: string };
@@ -25,6 +25,7 @@ export default function AssistantScreen() {
   const [transcript, setTranscript] = useState("");
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [aiPreferences, setAIPreferences] = useState<MobileAIPreferences | null>(null);
   const [speechInputState, setSpeechInputState] = useState<"loading" | "ready" | "unavailable">(
     () => isRunningInExpoGo() ? "unavailable" : "loading",
   );
@@ -33,6 +34,16 @@ export default function AssistantScreen() {
   const speechModuleRef = useRef<SpeechRecognitionModule | null>(null);
   const sendQuestionRef = useRef<(value: string, speakReply: boolean) => Promise<void>>(async () => {});
   const announceErrorRef = useRef<(message: string) => void>(() => {});
+  const token = state.status === "authenticated" ? state.token : "";
+
+  useFocusEffect(useCallback(() => {
+    if (!token) return;
+    let active = true;
+    void getMobileAISettings(token)
+      .then((settings) => { if (active) setAIPreferences(settings.preferences); })
+      .catch((cause: unknown) => console.error("Could not load Catalyst voice preferences", cause));
+    return () => { active = false; };
+  }, [token]));
 
   useFocusEffect(useCallback(() => {
     return () => { speechModuleRef.current?.abort(); void Speech.stop(); };
@@ -105,7 +116,6 @@ export default function AssistantScreen() {
     };
   }, []);
 
-  const token = state.status === "authenticated" ? state.token : "";
   async function sendQuestion(value = question, speakReply = false) {
     const trimmed = value.trim();
     if (!trimmed || asking) return;
@@ -127,7 +137,7 @@ export default function AssistantScreen() {
         sources: result.sources.length,
         retrievalStatus: result.retrievalStatus,
       }]);
-      if (speakReply && result.answer) speakAnswer(result.answer);
+      if ((speakReply || aiPreferences?.autoSpeak) && result.answer) speakAnswer(result.answer);
     } catch (cause) {
       announceError(cause instanceof Error ? cause.message : "Could not reach Catalysts Tutor.");
     } finally {
@@ -152,7 +162,15 @@ export default function AssistantScreen() {
     const play = (index: number) => {
       if (index >= chunks.length) { setSpeaking(false); return; }
       try {
-        Speech.speak(chunks[index], { language: "en-US", rate: 0.96, onDone: () => play(index + 1), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
+        Speech.speak(chunks[index], {
+          language: "en-US",
+          ...(aiPreferences?.voiceName ? { voice: aiPreferences.voiceName } : {}),
+          rate: aiPreferences?.voiceRate ?? 0.96,
+          pitch: aiPreferences?.voicePitch ?? 1,
+          onDone: () => play(index + 1),
+          onStopped: () => setSpeaking(false),
+          onError: () => setSpeaking(false),
+        });
       } catch {
         setSpeaking(false);
       }

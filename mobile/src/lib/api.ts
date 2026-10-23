@@ -96,6 +96,21 @@ export interface AcademicData {
 export interface MobileMaterial { id: string; filename: string; format: string; sizeBytes: number; status: string; processingError: string | null; title: string | null; courseId: string | null; courseCode: string | null; createdAt: string }
 export interface MobileNote { id: string; title: string; materialId: string; createdAt: string }
 export interface MobileNoteDetail extends MobileNote { content: { title: string; overview: string; sections: { heading: string; summary: string; keyPoints: string[]; definitions: {term: string;definition: string}[]; examples: string[] }[] }; sources: {materialId: string; page?: number; slide?: number; heading?: string}[] }
+export type MobileAIProvider = "anthropic" | "gemini" | "openai";
+export interface MobileAIPreferences {
+  voiceName: string;
+  voiceRate: number;
+  voicePitch: number;
+  autoSpeak: boolean;
+  responseLength: "concise" | "balanced" | "detailed";
+  tutorTone: "supportive" | "direct" | "socratic";
+}
+export interface MobileAISettings {
+  provider: MobileAIProvider;
+  defaultProvider: MobileAIProvider;
+  availableProviders: MobileAIProvider[];
+  preferences: MobileAIPreferences;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -447,6 +462,10 @@ export function getStudyNotes(token: string) { return request<MobileNote[]>("/ap
 export function generateStudyNotes(token: string, materialId: string, courseId?: string) { return request<{resourceId: string;content: MobileNoteDetail["content"]}>("/api/mobile/v1/study-notes", {method:"POST",body:JSON.stringify({materialId,courseId})}, token); }
 export function getStudyNote(token: string, id: string) { return request<MobileNoteDetail>(`/api/mobile/v1/study-notes/${encodeURIComponent(id)}`, {}, token); }
 export function deleteStudyNote(token: string, id: string) { return request<void>(`/api/mobile/v1/study-notes/${encodeURIComponent(id)}`, {method:"DELETE"}, token); }
+export function getMobileAISettings(token: string) { return request<MobileAISettings>("/api/mobile/v1/ai-settings", {}, token); }
+export function updateMobileAISettings(token: string, input: { action: "provider"; provider: MobileAIProvider } | { action: "resetProvider" } | { action: "preferences"; preferences: MobileAIPreferences }) {
+  return request<{ ok: true }>("/api/mobile/v1/ai-settings", { method: "PATCH", body: JSON.stringify(input) }, token);
+}
 
 export async function flushOfflineQueue(token: string) {
   const queue = await getQueuedMutations();

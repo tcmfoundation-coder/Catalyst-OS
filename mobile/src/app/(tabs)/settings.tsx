@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isRunningInExpoGo } from "expo";
+import * as Speech from "expo-speech";
 import { Link } from "expo-router";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
@@ -10,6 +11,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/lib/auth-context";
 import { useAppSettings } from "@/lib/settings-context";
 import { disableServerPush, enableServerPush } from "@/lib/push-notifications";
+import { getMobileAISettings, updateMobileAISettings, type MobileAIPreferences, type MobileAIProvider, type MobileAISettings } from "@/lib/api";
 import { colors, radius, space } from "@/theme/tokens";
 
 type ReminderKey = "studyReminder" | "taskReminder";
@@ -114,6 +116,9 @@ export default function SettingsScreen() {
         <Text style={styles.eyebrow}>PREFERENCES <Text style={styles.dim}>/ CONTROL CENTER</Text></Text>
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.settingHint}>Tune reminders, study goals, and how Catalysts moves on this device.</Text>
+
+        <SectionHeading eyebrow="INTELLIGENCE" title="AI control panel" />
+        <AISettingsPanel token={state.token} />
 
         <SectionHeading eyebrow="DEVICE CONTROLS" title="Notifications" />
         <HudPanel style={styles.settingsPanel}>
@@ -269,6 +274,248 @@ export default function SettingsScreen() {
   );
 }
 
+const PROVIDER_LABELS: Record<MobileAIProvider, string> = {
+  anthropic: "Anthropic Claude",
+  gemini: "Google Gemini",
+  openai: "OpenAI",
+};
+
+function AISettingsPanel({ token }: { token: string }) {
+  const [data, setData] = useState<MobileAISettings | null>(null);
+  const [voices, setVoices] = useState<Awaited<ReturnType<typeof Speech.getAvailableVoicesAsync>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [voicePickerOpen, setVoicePickerOpen] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getMobileAISettings(token)
+      .then((settings) => { if (active) { setData(settings); setError(null); } })
+      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Could not load AI settings."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    void Speech.getAvailableVoicesAsync()
+      .then((available) => { if (active) setVoices(available); })
+      .catch(() => { if (active) setVoices([]); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+
+  async function saveProvider(provider: MobileAIProvider | "default") {
+    if (!data) return;
+    const previous = data;
+    const nextProvider = provider === "default" ? data.defaultProvider : provider;
+    setData({ ...data, provider: nextProvider });
+    setSaving(true);
+    setMessage("Saving provider…");
+    setError(null);
+    try {
+      await updateMobileAISettings(token, provider === "default"
+        ? { action: "resetProvider" }
+        : { action: "provider", provider });
+      setMessage(`${PROVIDER_LABELS[nextProvider]} is now active.`);
+    } catch (cause) {
+      setData(previous);
+      setError(cause instanceof Error ? cause.message : "Could not change the AI provider.");
+      setMessage("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updatePreference<K extends keyof MobileAIPreferences>(key: K, nextValue: MobileAIPreferences[K]) {
+    if (!data) return;
+    const nextPreferences = { ...data.preferences, [key]: nextValue };
+    setData({ ...data, preferences: nextPreferences });
+    setMessage("Saving AI preferences…");
+    setError(null);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void updateMobileAISettings(token, { action: "preferences", preferences: nextPreferences })
+        .then(() => setMessage("AI preferences saved."))
+        .catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : "Could not save AI preferences.");
+          setMessage("");
+        });
+    }, 400);
+  }
+
+  function stepPreference(key: "voiceRate" | "voicePitch", delta: number) {
+    if (!data) return;
+    const nextValue = Math.max(0.75, Math.min(1.25, Math.round((data.preferences[key] + delta) * 100) / 100));
+    updatePreference(key, nextValue);
+  }
+
+  function previewVoice() {
+    if (!data) return;
+    const voice = voices.find((item) => item.identifier === data.preferences.voiceName);
+    void Speech.stop();
+    Speech.speak("Hello, I’m Catalyst. Your AI voice settings are ready.", {
+      language: voice?.language ?? "en-US",
+      voice: data.preferences.voiceName || undefined,
+      rate: data.preferences.voiceRate,
+      pitch: data.preferences.voicePitch,
+      onStart: () => setMessage("Playing voice preview…"),
+      onDone: () => setMessage("Voice preview finished."),
+      onError: () => setError("Could not play this voice on the device."),
+    });
+  }
+
+  if (loading) {
+    return <HudPanel style={styles.settingsPanel}><View style={styles.status}><ActivityIndicator size="small" color={colors.cyan} /><Text style={styles.settingHint}>Loading your AI settings…</Text></View></HudPanel>;
+  }
+  if (error && !data) {
+    return (
+      <HudPanel style={styles.settingsPanel}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TactilePressable accessibilityRole="button" onPress={() => {
+          setError(null);
+          setLoading(true);
+          void getMobileAISettings(token)
+            .then((settings) => setData(settings))
+            .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not load AI settings."))
+            .finally(() => setLoading(false));
+        }} style={styles.retryButton}>
+          <Text style={styles.retryText}>Reload AI settings</Text>
+        </TactilePressable>
+      </HudPanel>
+    );
+  }
+  if (!data) return null;
+
+  const selectedVoice = voices.find((voice) => voice.identifier === data.preferences.voiceName);
+  return (
+    <>
+      <HudPanel style={styles.settingsPanel}>
+        <Text style={styles.settingTitle}>AI provider</Text>
+        <Text style={styles.settingHint}>Choose from providers configured for your account. Keys stay on the server.</Text>
+        {data.availableProviders.length ? data.availableProviders.map((provider) => {
+          const selected = provider === data.provider;
+          return (
+            <TactilePressable key={provider} accessibilityRole="radio" accessibilityState={{ selected }} disabled={saving} onPress={() => void saveProvider(provider)} style={[styles.providerOption, selected && styles.providerOptionSelected]}>
+              <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>{selected ? <View style={styles.radioInner} /> : null}</View>
+              <Text style={styles.providerName}>{PROVIDER_LABELS[provider]}</Text>
+              {selected ? <Text style={styles.activeLabel}>ACTIVE</Text> : null}
+            </TactilePressable>
+          );
+        }) : <Text style={styles.reminderNotice}>No AI provider is configured on the server yet.</Text>}
+        {data.availableProviders.length > 0 && data.provider !== data.defaultProvider ? (
+          <TactilePressable accessibilityRole="button" disabled={saving} onPress={() => void saveProvider("default")} style={styles.resetProviderButton}>
+            <Text style={styles.retryText}>Use system default · {PROVIDER_LABELS[data.defaultProvider]}</Text>
+          </TactilePressable>
+        ) : null}
+
+        <View style={styles.aiDivider} />
+        <Text style={styles.settingTitle}>Response style</Text>
+        <Text style={styles.settingHint}>Set the default answer length and tutoring approach.</Text>
+        <Text style={styles.controlLabel}>Answer length</Text>
+        <ChoiceRow
+          values={["concise", "balanced", "detailed"]}
+          labels={["Concise", "Balanced", "Detailed"]}
+          selected={data.preferences.responseLength}
+          disabled={saving}
+          onSelect={(value) => updatePreference("responseLength", value as MobileAIPreferences["responseLength"])}
+        />
+        <Text style={styles.controlLabel}>Tutor style</Text>
+        <ChoiceRow
+          values={["supportive", "direct", "socratic"]}
+          labels={["Supportive", "Direct", "Socratic"]}
+          selected={data.preferences.tutorTone}
+          disabled={saving}
+          onSelect={(value) => updatePreference("tutorTone", value as MobileAIPreferences["tutorTone"])}
+        />
+
+        <View style={styles.aiDivider} />
+        <Text style={styles.settingTitle}>Assistant voice</Text>
+        <Text style={styles.settingHint}>Voice choices come from your device. They are not uploaded to Catalysts.</Text>
+        <TactilePressable accessibilityRole="button" onPress={() => setVoicePickerOpen(true)} style={styles.voiceSelect}>
+          <View style={styles.voiceSelectCopy}>
+            <Text style={styles.voiceSelectLabel}>VOICE</Text>
+            <Text numberOfLines={1} style={styles.voiceSelectName}>{selectedVoice ? `${selectedVoice.name} · ${selectedVoice.language}` : data.preferences.voiceName ? "Saved voice unavailable on this device" : "System default"}</Text>
+          </View>
+          <Text style={styles.chevron}>⌄</Text>
+        </TactilePressable>
+        <PreferenceStepper label="Speaking speed" value={data.preferences.voiceRate} suffix="×" onDecrease={() => stepPreference("voiceRate", -0.05)} onIncrease={() => stepPreference("voiceRate", 0.05)} />
+        <PreferenceStepper label="Voice pitch" value={data.preferences.voicePitch} suffix="" onDecrease={() => stepPreference("voicePitch", -0.05)} onIncrease={() => stepPreference("voicePitch", 0.05)} />
+        <View style={styles.reminderRow}>
+          <View style={styles.reminderCopy}>
+            <Text style={styles.settingTitle}>Speak replies automatically</Text>
+            <Text style={styles.settingHint}>Read new tutor answers aloud in the assistant.</Text>
+          </View>
+          <Switch accessibilityLabel="Automatically speak new AI replies" value={data.preferences.autoSpeak} disabled={saving} onValueChange={(enabled) => updatePreference("autoSpeak", enabled)} trackColor={{ false: "#34434C", true: `${colors.lime}88` }} thumbColor={data.preferences.autoSpeak ? colors.lime : "#A8B4BA"} />
+        </View>
+        <TactilePressable accessibilityRole="button" onPress={previewVoice} style={styles.previewVoiceButton}>
+          <Text style={styles.previewVoiceText}>▶  Preview voice</Text>
+        </TactilePressable>
+        {message ? <Text accessibilityLiveRegion="polite" style={styles.footnote}>{message}</Text> : null}
+        {error ? <Text accessibilityLiveRegion="assertive" style={styles.errorText}>{error}</Text> : null}
+      </HudPanel>
+
+      <Modal visible={voicePickerOpen} transparent animationType="fade" onRequestClose={() => setVoicePickerOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Choose assistant voice</Text>
+              <Pressable accessibilityRole="button" onPress={() => setVoicePickerOpen(false)}><Text style={styles.pickerAction}>Done</Text></Pressable>
+            </View>
+            <ScrollView style={styles.voiceList}>
+              <VoiceOption label="System default" selected={!data.preferences.voiceName} onPress={() => { setVoicePickerOpen(false); updatePreference("voiceName", ""); }} />
+              {voices.map((voice) => (
+                <VoiceOption key={voice.identifier} label={`${voice.name} · ${voice.language}`} selected={voice.identifier === data.preferences.voiceName} onPress={() => { setVoicePickerOpen(false); updatePreference("voiceName", voice.identifier); }} />
+              ))}
+              {voices.length === 0 ? <Text style={styles.settingHint}>No device voices were reported. System default remains available.</Text> : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function ChoiceRow({ values, labels, selected, disabled, onSelect }: { values: string[]; labels: string[]; selected: string; disabled: boolean; onSelect: (value: string) => void }) {
+  return (
+    <View style={styles.choiceRow}>
+      {values.map((value, index) => (
+        <TactilePressable key={value} accessibilityRole="radio" accessibilityState={{ selected: selected === value }} disabled={disabled} onPress={() => onSelect(value)} style={[styles.choiceButton, selected === value && styles.choiceButtonSelected]}>
+          <Text style={[styles.choiceText, selected === value && styles.choiceTextSelected]}>{labels[index]}</Text>
+        </TactilePressable>
+      ))}
+    </View>
+  );
+}
+
+function PreferenceStepper({ label, value, suffix, onDecrease, onIncrease }: { label: string; value: number; suffix: string; onDecrease: () => void; onIncrease: () => void }) {
+  return (
+    <View style={styles.stepperRow}>
+      <Text style={styles.controlLabel}>{label}</Text>
+      <View style={styles.stepperControls}>
+        <TactilePressable accessibilityRole="button" accessibilityLabel={`Decrease ${label.toLowerCase()}`} onPress={onDecrease} disabled={value <= 0.75} style={styles.stepButton}><Text style={styles.stepText}>−</Text></TactilePressable>
+        <Text style={styles.stepValue}>{value.toFixed(2)}{suffix}</Text>
+        <TactilePressable accessibilityRole="button" accessibilityLabel={`Increase ${label.toLowerCase()}`} onPress={onIncrease} disabled={value >= 1.25} style={styles.stepButton}><Text style={styles.stepText}>+</Text></TactilePressable>
+      </View>
+    </View>
+  );
+}
+
+function VoiceOption({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <TactilePressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={styles.voiceOption}>
+      <Text numberOfLines={2} style={styles.voiceOptionText}>{label}</Text>
+      {selected ? <Text style={styles.activeLabel}>SELECTED</Text> : null}
+    </TactilePressable>
+  );
+}
+
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
   return <View style={styles.sectionHeading}><Text style={styles.sectionEyebrow}>{eyebrow}</Text><Text style={styles.sectionTitle}>{title}</Text></View>;
 }
@@ -334,6 +581,36 @@ const styles = StyleSheet.create({
   retryText: { color: colors.cyan, fontSize: 10, fontWeight: "800" },
   resetButton: { minHeight: 34, justifyContent: "center", paddingHorizontal: 12, borderRadius: radius.control, borderColor: "#39474D", backgroundColor: "#11191E" },
   resetText: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  providerOption: { minHeight: 50, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 11, borderRadius: radius.control, borderWidth: 1, borderColor: "#293943", backgroundColor: "#0A1117" },
+  providerOptionSelected: { borderColor: `${colors.lime}80`, backgroundColor: "#152019" },
+  radioOuter: { width: 17, height: 17, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: colors.subtle, borderRadius: 9 },
+  radioOuterSelected: { borderColor: colors.lime },
+  radioInner: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.lime },
+  providerName: { flex: 1, color: colors.foreground, fontSize: 11, fontWeight: "700" },
+  activeLabel: { color: colors.lime, fontSize: 7, fontWeight: "900", letterSpacing: 0.85 },
+  resetProviderButton: { minHeight: 38, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: 10, borderRadius: radius.control, borderWidth: 1, borderColor: "#39474D", backgroundColor: "#11191E" },
+  aiDivider: { height: 1, backgroundColor: colors.line, marginVertical: 3 },
+  controlLabel: { color: colors.muted, fontSize: 9, fontWeight: "700", marginTop: 3 },
+  choiceRow: { flexDirection: "row", gap: 6 },
+  choiceButton: { flex: 1, minHeight: 39, alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderRadius: radius.control, borderWidth: 1, borderColor: "#293943", backgroundColor: "#0A1117" },
+  choiceButtonSelected: { borderColor: `${colors.cyan}80`, backgroundColor: "#10212A" },
+  choiceText: { color: colors.muted, fontSize: 8, fontWeight: "700", textAlign: "center" },
+  choiceTextSelected: { color: colors.cyan },
+  voiceSelect: { minHeight: 51, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 11, borderRadius: radius.control, borderWidth: 1, borderColor: "#33464D", backgroundColor: "#0A1117" },
+  voiceSelectCopy: { flex: 1, gap: 3 },
+  voiceSelectLabel: { color: colors.cyan, fontSize: 7, fontWeight: "900", letterSpacing: 0.9 },
+  voiceSelectName: { color: colors.foreground, fontSize: 10, fontWeight: "700" },
+  chevron: { color: colors.cyan, fontSize: 21, fontWeight: "300" },
+  stepperRow: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  stepperControls: { flexDirection: "row", alignItems: "center", gap: 10 },
+  stepButton: { width: 30, height: 30, alignItems: "center", justifyContent: "center", borderRadius: radius.control, borderWidth: 1, borderColor: "#33464D", backgroundColor: "#101920" },
+  stepText: { color: colors.cyan, fontSize: 17, fontWeight: "600", lineHeight: 20 },
+  stepValue: { minWidth: 42, color: colors.foreground, fontSize: 10, fontWeight: "800", textAlign: "center" },
+  previewVoiceButton: { minHeight: 40, alignItems: "center", justifyContent: "center", borderRadius: radius.control, borderWidth: 1, borderColor: `${colors.lime}55`, backgroundColor: "#162019" },
+  previewVoiceText: { color: colors.lime, fontSize: 10, fontWeight: "800" },
+  voiceList: { maxHeight: 420 },
+  voiceOption: { minHeight: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 8 },
+  voiceOptionText: { flex: 1, color: colors.foreground, fontSize: 10, lineHeight: 15 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#000000A8", padding: space.md },
   pickerSheet: { borderRadius: radius.hero, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: space.md },
   pickerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xs, paddingBottom: space.sm },
