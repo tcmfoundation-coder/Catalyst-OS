@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { connectToDatabase } from "@/lib/db";
-import { getUserLLMProvider } from "@/lib/ai/user-provider";
+import { getUserAIPreferences, getUserLLMProvider } from "@/lib/ai/user-provider";
 import { askStructured } from "@/lib/ai/orchestrator";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import { Task } from "@/models/Task";
@@ -62,6 +62,11 @@ export async function recommendDailyPriority(
     .lean();
   const allowedCandidates = candidates.map((task) => ({ id: task._id.toString(), title: task.title }));
 
+  const [llmProvider, aiPreferences] = await Promise.all([
+    deps.llmProvider ? Promise.resolve(deps.llmProvider) : getUserLLMProvider(userId),
+    getUserAIPreferences(userId),
+  ]);
+
   const generated = await askStructured(
     userId,
     {
@@ -72,8 +77,11 @@ export async function recommendDailyPriority(
     DAILY_PRIORITY_SCHEMA,
     "daily_priority",
     {
-      llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId),
-      roleInstructions: DAILY_PRIORITY_INSTRUCTIONS,
+      llmProvider,
+      roleInstructions: [
+        DAILY_PRIORITY_INSTRUCTIONS,
+        aiPreferences.responseLength === "detailed" ? "Preference: give a little more detail in the reason and next step, while respecting their strict length limits." : null,
+      ].filter(Boolean).join("\n\n"),
     },
   );
 

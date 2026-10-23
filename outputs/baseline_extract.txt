@@ -1,0 +1,1282 @@
+R eceiv ed: 21 December 2020
+-
+R evised: 15 April 2021
+-
+Accepte d: 26 April 2021
+-
+IET Cyber‐Phy sical Systems: Theor y & Applications
+DOI: 10.1049/cps2.12014
+ORIGINAL RESEARCH P APER
+Man‐in‐the‐middle attacks and defence in a power system
+cyber‐ph ysical testbed
+P atrick Wlazlo
+1
+| Abhijeet Sahu
+2
+| Zeyu Mao
+2
+| Hao Huang
+2
+| Ana Goular t
+1
+|
+K atherine Dav is
+2
+| Saman Zonouz
+3
+1
+Electronics Systems Engineering T echnolog y, T exas
+A&M Univer sity, College Station, TX, USA
+2
+Electrical and Computer Engineering, T exas A&M
+Univ ersity, College Station, TX, USA
+3
+Electrical and Computer Engineering, R utgers
+Univ ersity, New Br unswick, NJ, USA
+Cor respondence
+Ana Goulart, Electronics Systems Engineering
+T echnolog y , T exas A&M Univ ersity , College Station,
+T exas , USA.
+Email: g oulart@tamu.edu
+Funding infor mation
+U .S . Depar tment of Energ y, Grant/A ward Number :
+DE‐OE0000895
+Abstract
+Man‐in‐The‐ Middle (MiTM) attacks present n umerous threats to a smart g rid. In a
+MiTM attac k, an intr uder embeds itself within a con versation between tw o devices to
+either eav esdrop or impersonate one of the devices , making it appear to be a nor mal
+ex c hang e of infor mation. Thus, the intr uder can perfor m false data injection (FDI)
+and false command injection (FCI) attacks that can compromise pow er system op-
+erations , such as state estimation, economic dispatch, and automatic g eneration
+control (A GC). V er y few researc hers ha ve focused on MiTM methods that are
+difficult to detect within a smar t g rid. T o address this , w e are designing and imple-
+menting m ulti‐stag e MiTM intr usions in an emulation ‐based cyber‐ph ysical pow er
+system testbed against a larg e‐scale synthetic g rid model to demonstrate ho w suc h
+attacks can cause physic al continge ncies such as misguided operation and false
+measurements . MiTM intr usions create FCI, FDI, and re pla y attacks in this synthetic
+po wer g rid. This w ork enables stak eholders to defend aga inst these stealth y attacks ,
+and w e present detection mech anisms that are dev eloped using m ultiple aler ts from
+intr usion detection systems and netw ork monitoring tools . Our contribution will
+enable other smar t g rid security researc hers and industr y to develop furt her detection
+mechanisms for inconspicuous MiTM attac ks .
+1 | INTR ODUCTION
+Th e integ ration of infor mation tec hnolog y (IT) with industrial
+control systems (ICS) has revol utionized smar t control of
+critical infrastr ucture systems such as energ y , water , che mical,
+and transpor tation. F ast and accurate remote data collection
+and processing are helping to automate and optimize these
+sectors [1]. Initially , the integ ration of IT (cyber) and ICS
+(physi cal) systems focused on utility rather than data security .
+Th is lack of consideration for security in the design phase has
+per mitted serious security problems suc h as Stuxnet malw are
+[2], the Ukraine attac ks [3, 4], and the intr usion in the European
+Netw ork of T ransmission System Operators in 2020 [5]. Due to
+the increasing aw areness of suc h mult i‐stage, advanced
+conce pt‐of‐operations attacks , critical infrastr ucture stak e-
+holders are focussing on the security of their netw orks , by
+follo wing cyber‐physical security policies that are unique to
+different sectors . Thes e policies and decisions are g ov er ned by
+the threat models associated with the specific systems in each
+ph ysical domain. In particular, the physic al domain addressed in
+this paper is the energ y sector , where w e inv estig ate man‐in‐
+the‐middle (MiTM) attac ks to an electrical utility's super visor y
+control and data acquisition system (SCAD A).
+A MiTM attack is one of the oldest for ms of cyber in-
+tr usions , where a perpetrator positions itself in a con versation
+betw een tw o end points to either passiv ely ea vesdrop or
+acti v ely impersonate one of the end points . MiTM attacks
+encompass different techniques , dep ending on the threat
+model. F or example , Secure Soc k et La yer (SSL) hijackin g is an
+attac k where a man‐in‐the‐middle intercep ts a request from
+client to ser v er , then continues to establish an encr ypted ses-
+sion betw een itself and the ser ver , and a regular session
+This is an open access ar ticle under the ter ms of the Creativ e Commons Attribution‐NonCommercial License, which per mits use, distribution and reproduction in any medium, provided
+the original wo rk is properly cited and is not used for commercial purp oses .
+© 2021 The Authors . IET Cyber‐Physical Systems: Theory & Applications published by J ohn Wiley & Sons Ltd on behalf of The Institution of Engineering and T echnolog y .
+164
+-
+IET Cyber‐Phys. Syst., Theory Appl. 2021;6:164 – 177. wileyonlinelibrary .com/journal/cps2
+\nbetw een itself and the client, thus appearing to be a secure
+ex c hang e betw een client and ser ver .
+Similar to SSL hijack ing, SCAD A protocols suc h as
+Distributed Netw ork Protocol‐3 (DNP3), Modbus , and IEC‐
+61850 can also be intercep ted. If this happens , there is a po-
+tential to cause sever e damag e to energ y systems , suc h as these
+scenarios:
+� F alse data injection (FDI) can be perfor med that com-
+promises state estimations [6], whic h affect economic
+dispatch [7], ge neration sc heduling, and load forecasting
+among others .
+� F alse command injection (FCI) can be perfor med that can
+cause minor to major impacts , such as cascading failures and
+black outs .
+� Eav esdropping, where an intr uder intercep ts and reads
+pac kets , then uses this infor mation to learn how the system
+operates .
+Further more, some MiTM attac ks can be stealth y enough
+to evade conv entional intr usion detection systems (IDS).
+First, the added latency caused by a MiTM intercep ting
+pac kets may be difficult to detect in a wide area netw ork
+(W AN). ICS data pack ets also ha v e different delays dep end-
+ing on the application [8], and polling frequencies range from
+milliseconds to hours . Hence, delays that w ould occur due to
+MiTM can g et mask ed due to nor mal behavio ur of the sys-
+tem. Second, most off‐the‐shelf security tools to detect
+MiTM attacks are designed for traditional Inter net applica-
+tions and do not support ICS protocols . Th ere are a lot of
+proprietar y ICS protocols , and there are v endor‐specific
+implementations of protocols like DNP3. Moreov er , a
+cyber‐physi cal testbed is needed to verify the impact of
+MiTM attac ks and w ays to mitigate them.
+Thus, our w ork addresses these gaps and challenges by
+focussing on MiTM attac k methods that are difficult to detect
+within a smart g rid and how to detect them. Our main con-
+tributions can be described as follows:
+� W e present an automated attac k surface assessment solution
+for cyber‐physi cal pow er g rid infrastr uctures against MiTM
+attack v ectors . It facilitates exhaustiv e simulation and
+exploration of v arious threats agai nst the cyber‐physi cal
+platfor m accurately and efficiently , and without real‐w orld
+consequences and system failures . W e mak e the proposed
+framew ork publicly a vai lable, it can be used by researc hers in
+the field to collect comprehensi ve realistic datasets for
+purpos es suc h as the training of mac hine lear ning models to
+prov ide security protection.
+� W e present a new intr usion detection solution for cyber‐
+ph ysical pow er g rid platfor ms aga inst the emerging MiTM
+attack vectors . In design of our intr usion detection frame-
+w ork, we leverage the test‐bed w e built and the automated tool
+w e designed in our first contribution. With exhaustiv e attac k
+v ector simul ation against the realistic cyber‐ph ysical test‐bed,
+w e ev aluate the efficiency of our proposed intr usion detection
+solution and incrementally improv e its detection accuracy .
+Th e rest of this paper is organized into the follo wing
+sections . In Section 2, w e evaluate previous papers on MiTM
+attac ks perfor med within a cyber‐physi cal testbed and their
+limitations . Section 3 prov ides bac kg round on DNP3, MiTM
+attac ks , and an ov er view of our testbed. In Section 4, we
+present different methods for MiTM attacks on DNP3, such as
+binar y operate and analogue direct operate modifications , with
+detailed alg orithms . W e describe ho w an intr usion detection
+system can be configured to help detect tw o kinds of cyber
+attac k in Section 5. In Section 6, w e present four MiTM attack
+use cases and analyse metrics that can be used to indirectly
+detect a MiTM attack. Conclusions and a review of our con-
+tributions are discussed in Section 7.
+2 | RELATED W ORK
+There are sever al papers that describe MiTM attacks on energ y
+systems that ha ve cyber‐physical system (CPS) testbeds and
+perfor m experiments on industrial control protocols . Th eir
+cyber‐ph ysical testbeds differ in ter ms of pow er and netw ork
+sim ulators or emulators , amount and type of physic al devices ,
+and which energ y system they model and in how muc h detail
+(e .g . pow er transmission or pow er ge neration).
+When comparing these papers , we obser v e cer tain limita-
+tions that are addressed by our w ork: (a) they targ et small scale
+systems and suppor t limited attack scenarios , (b) they do not
+include details on how the MiTM attack started, and (c) they do
+not show ho w to detect stealth y MiTM attac ks .
+In [9], denial of ser vice (DoS) attac ks are perfor med in a
+CPS testbed whic h has a real‐time digital simulator (R TDS) for
+po w er , netw ork simulator ‐3 for commun ications , and devices
+suc h as phasor measurement units (PMUs) and phasor data
+concentrators (PDCs). Th ey perfor m DoS attac ks that increase
+dela ys in the communications links . The attac k targ ets vo ltag e
+stability monitoring and control in a transmission system.
+Ho w ever , the method adopted in creating the DoS attack is not
+thoroughly presented in the paper .
+Th e CPS testbed in [10] uses RTD S , Opal‐RT , and a W AN
+em ulator to demonstrate cascading failures . The failures w ere
+caused by a coordinated data integ rity attack that trig ge red the
+operation of a remedial action scheme . With false measure-
+ments , the MiTM attac ks manipulated the automatic genera-
+tion control (A GC) alg orithm to take the wrong control action.
+Similarly , in [11] A GC is targeted by MiTM attacks , where
+DNP3 pack ets car r ying frequency and tie line flow measure-
+ments are modified using Scapy [12] tools . Although the
+ph ysical scenarios in these cases are demonstrated, the pre-
+cursors of the MiTM attack are not explained clearly .
+A Modbus‐based MiTM attac k on a CPS testbed is pre-
+sented in [13]. Th e authors use Ettercap and LibModbus li-
+braries to poison the address resolution protocol (ARP) cache
+and manipulate the Modbus pac k ets that affects the controller
+for a static vo lt‐ampere reactiv e compensator . T o simulate a
+comm unication netw ork, the authors use the Opnet simul ator
+that provides system‐in‐the‐loop features to connect real de-
+vices to the simulator . Another w ork [14] also uses existing
+WLAZLO ET AL .
+-
+165
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nlibraries for perfor ming a MiTM attack on a g rid ‐ connected
+photov oltaic plant using the Metasploit framew ork. The test-
+bed in [ 14 ] uses Schw eitzer Engineering Laboratories (SEL)
+PMU hardwa re and the IEC 60870 ‐ 5 ‐ 103 protocol to
+demonstrate the attack scenario . Ho w ever , in both cases , due
+to the limitations of the open source Metasploit and Ettercap
+framew orks , only limited threat models are possible for the
+ICS protocols .
+A multi ‐ dimensional SCAD A ‐ specific IDS is presented in
+[ 15 ]. It detects MiTM attac ks on IEC 61850 traffic in a real
+500 kV substation. Th e MiTM attacks can easily be integ rated
+in small test cases , but they ha ve not been studied for large
+scale g rids .
+R ecent w ork on the Idaho CPS testbed [ 16 ] presents MiTM
+attacks on IEC C37.118, IEC 61850, and DNP3. Ho wev er , the
+impact of the attacks on the po w er system is not presented,
+and the strateg y adopted b y incorporat ing the MiTM attac ks is
+not clear . Another MiTM attack using DNP3 is presented in
+[ 17 ], which also does not clearly illustrate the physic al side
+threat model.
+A uthors in [ 1 ] present a MiTM attack on PMUs and PDCs
+by generating IEEE C37.118 pac kets using Wireshark. The use
+of Wireshark for creating a MiTM attack is unrealistic because
+it adds latency to the system that can be easily detected.
+On the topic of latency and the impact of delays on the
+pow er system, the delay for ICS pac kets w as studied in [ 18 ].
+Th e authors found that for a nor mal relay's TRIP/CLOSE
+command the maxim um tolerable delay w as betw een 3 and
+16 ms . Th e maxim um delay for a human mac hine interface
+w orkstation to receiv e updates was betw een 16 and 100 ms .
+Th is is a considerable short time frame for a MiTM intr usion
+to modify pac kets .
+Also , the authors in [ 19 ] address delays in a pow er g ener-
+ation system by varyi ng the transmission delay of the
+communication links that car r y the A GC data pac kets . When
+the transmission delay w as increased, the o vershoot amplitude
+and delay time of the g enerators both increased. Thi s in tur n
+caused a temporar y increase in the frequency of the trans-
+mission g rid. Thi s demonstrates the import ance of timely de-
+liv er y of SCAD A pack ets .
+A more recent w ork [ 20 ], which cov ers g eneration systems
+in microg rids , sho ws that when the delay of a communication
+netw ork for a photo ‐ vo ltaic system increases past the
+maxim um tolerable communica tion delay , more pow er is
+produced than the load demands . Th is aga in sho ws that the
+delay of g enerator control commands for a pow er g eneration
+system must be promptly receiv ed and in regular inter vals to
+av oid ov er ‐ voltage.
+T o complement these previous w orks , our contribution is
+to inv estigate MiTM threat scenarios in the context of SCAD A
+systems and ho w compromised DNP3 pack ets can cause
+failures to the physic al system. Using our own libraries and
+scripts to emulate the MiTM attac ks , we implement and analyse
+use case scenarios in a CPS testbed that simul ates a larg e scale
+synthetic electric g rid based on the T exas footprint [ 21, 22 ],
+where the attack er's stealthiness and impact on various sce-
+narios , in the context of 5 to 10 simulated substations , are
+ev aluated. Such evaluations pla y a major role in exploring the
+threat space and proposing detection mechanism using
+netw ork metrics such as retransmission rate and netw ork de-
+la ys . W e present detection mechanisms that will enable other
+smart g rid security researc hers and industr y stakeholders to
+detect similar MiTM attac ks .
+3 | BACKGR OUND
+This section giv es a bac kg round on the implementation of
+m ulti ‐ stag e MiTM attacks for DNP3 in our emula tion ‐ based
+cyber ‐ ph ysical po w er system testbed. First, we present an
+o ver view of DNP3 and MiTM attack types . Our testbed, whic h
+allo ws us to model these MiTM threat and defence scenarios , is
+also explained in this section.
+3.1 | DNP3
+DNP3 [ 23 ] is a protocol used in SCAD A systems for moni-
+toring and controlling field devices . Th e protocol was released
+in 1993 for RS ‐ 485 serial links but has been upg raded to w ork
+with TCP/IP netw orks . It can ha ve mult iple netw ork setups
+using a master/outstation architecture . One example is a mult i ‐
+drop netw ork, where a DNP3 master communicates with more
+than one DNP3 outstation. Another example is a one ‐ on ‐ one
+netw ork where a DNP3 master communicates with only one
+outstation.
+Th ere are three laye rs in the DNP3 protocol:
+1. The data link layer ensures the reliability of the physic al
+link by detecting er rors and duplicate frames . As sho wn in
+the example DNP3 pac ket in Figure 1 , the DNP3 header
+has 10 byt es , or octets , including tw o synchronization octets
+(\x05 \x64), follow ed b y a frame length, data link control
+infor mation field, and source and destination device ad-
+dresses . At the end, there is a cyclic redundancy er ror (CRC)
+code to detect any bit er rors in the header .
+2. The transport layer suppor ts fragmentation and reassembly
+of large application pa yloads . Using one octet, it stores FIR
+(1 bit), FIN (1 bit) and sequence numbe r (6 bits), where FIR
+and FIN deter mine if the fragment is the first or the last
+fragment. Th e sequence numbe r identifies each fragment so
+FIGUR E 1 Hexadecimal representation of a DNP3 pack et str ucture
+166
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nthat they can be reassembled in the cor rect order before
+they are sent to the application layer .
+3. Th e application layer prov ides ser vices to the DNP3 user
+software so that DNP3 devices can send and recei ve mes-
+sage s . First, the application la yer deals with DNP3 devices ,
+known as DNP3 points , and then g roups them according to
+their type: binar y inputs (BI), binar y outputs (BO), analogue
+inputs (AI), analogue outputs (AO), and counter input.
+Each g roup is identified by an index. Also , the application
+layer organizes static data and events into classes , where
+Class 0 means static data and Classes 1, 2, and 3 cor respond
+to even ts with different priorities . Static data means the
+state of a DNP3 point, whereas an event means a change in
+the cur rent state . T o indicate the purpose of the DNP3
+messag e , the application laye r header has a function code
+(FC) octet (T able 1). There are tw o w a ys to send a com-
+mand from the master to the outstation: the SELECT
+OPERA TE where the master sends a select pac ket to a
+device in the outstation (FC:03), follow ed by the operation
+it should perfor m (FC:04); or the DIRECT OPERA TE
+(FC:05), where one pack et contains the device address with
+the operation it should perfor m.
+Similar to other Internet protocols , the DNP3 pack et
+contains a header and a pa yload. Th e DNP3 pa yload has
+mult iple data chunks, consisting of 16‐octet data block s fol-
+low ed by a tw o‐octet CR C to ensure each data block 's integ rity .
+Inside the pa yload, a function code is used to identify the
+operation the outstation should perfor m, as in T able 1. Th e
+index will tell the outstation which device within the outstation
+the master is requesting the operation to be perfor med on, or
+retriev e data from. As sho wn in the sample pac ket in Figure 1,
+w e can see the hexadecimal re presentation of a binar y
+DIRECT OPERA TE DNP3 pac ket (FC:05). Th is pac ket is
+index ed to close break er sev en in a substation of the T exas
+synthetic g rid model. Thi s is indicated b y the index 0700, along
+with the 41 control code to close the break er .
+As for confidentiality , DNP3 is a clear text, unencr ypted,
+protocol with no inherent security mech anism [25]. F or this
+reason, the DNP3 protocol is susce ptible to MiTM attacks ,
+where an outsider can eav esdrop the communica tion betw een
+tw o nodes and modify the content of the pac kets . Th ere ha ve
+been n umerous studies that tr y to incorpo rate encr yption onto
+the DNP3 protocol using T ransport La yer Security encr yption.
+Ho w ever , this has not been widely adopted since maintaining
+time‐sensiti ve public‐ke y cer tificate ser v er av ailable for the
+DNP3 ser v er and client requires costly upg rades to existing
+field equipment.
+3.2 | ARP cache poisoning
+The first ste p of the MiTM attac k is for the adversary to
+impersonate a netw ork device . This is done using ARP
+spoofing, or ARP cache poisoning, where the adversar y sends
+an unsolicited ARP messag e to the targeted node . Th ese
+messages are used to link the adver sar y's hardwa re address , or
+media access control (MA C) address , with the Inter net pro-
+tocol (IP) address of the targeted device .
+As illustrated in Figure 2, the adv ersar y sends an unsolic-
+ited ARP frame to the substation router telling the router to
+cor relate the outstation's IP address with the adversar y's MA C
+address . Thus, when the substation router needs to deliv er a
+pac k et to the outstation, the router will instead forw ard it to
+the adversar y . Similarly , the adv ersar y sends an unsolicited ARP
+pac k et to the outstation node so that it maps the router's IP
+address to the adversary' s MA C address . After these unsolic-
+ited ARP pac kets , the adversary receiv es all pac k ets sent be-
+tw een outstation and router . Th e adver sar y can no w read or
+modify the pac kets' contents , before it forwards the pac kets to
+the cor rect device . Th e adversary in the example in Figure 2
+c hanges a DIRECT OPERA TE command from CLOSE to
+TRIP, as w ell as a the response from TRIP to CLOSE. As a
+result, the DNP3 communication channel remains open, and
+neither router nor outstation suspects that their pac kets are
+being intercep ted.
+Th e MiTM time diag ram in Figure 2 shows that the ma-
+jority of the delay is at the adversary node , where the DIRECT
+OPERA TE command is modified. Thi s processing delay , or
+data injection delay , is the amount of time the adversar y needs
+to filter the DNP3 pac kets , modify the pac kets' contents , and
+recalculate the DNP3 laye rs' CR C and TCP header c hecksum.
+A small portion of the delay time is due to the longer route the
+pac k et m ust trav el after the ARP cach e poisoning, since the
+pac k et is g oing through an extra node, the adversar y .
+TABLE 1 Function codes for DNP3 pack ets [24]
+Function code (Hex) Operation
+0 � 00 Confir m
+0 � 01 R ead
+0 � 02 Wire
+0 � 03 Select
+0 � 04 Operate
+0 � 05 Direct operate with ackno wledge
+0 � 06 Direct operate without ackn owledge
+0 � 07 Freeze with ackno wledge
+0 � 08 Immediate freeze – No ackno wledg e
+0 � 09 Freeze and clear with ackno wledge
+0 � 10 Freeze and clear – No ackno wledge
+0 � 13 Cold restart
+0 � 14 Enable spontaneous messages
+0 � 15 Disable spontaneous messages
+0 � 16 Assign classes
+0 � 17 Delay measurement
+0 � 81 Solicited response
+0 � 82 Unsolicited response
+WLAZLO ET AL .
+-
+167
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\n3.3 | Integ ration of MiTM attacks in
+RESLa b testbed
+Th e MiTM attacks in our w ork are prog rammed to perfor m a
+staged intr usion, by trespassing into the broadcast domain of
+one substation's local area netw ork (LAN). Th e trespassing
+could be a result of the adv ersar y getting physical access to the
+substation site or by ge tting the credentials and remote access
+of one of the local devices .
+T o simul ate a substation LAN and control centre, we use
+the RESLab testbed [ 26 ], sho wn in Figure 3 , which is a CPS
+testbed comprised of the following components:
+� Network Emulator – the Common Open R esearch
+Emulator (CORE) [ 27 ] emula tes the commun ication
+netw ork. CORE is a Linux ‐ based application maintained by
+the U .S . Nav al R esearch Laborator y that uses FreeBSD jails
+configured as routers , switch es , ser v ers , and personal com-
+puters to create v arious em ulated netw ork nodes .
+� DNP3 Master – there are tw o different DNP3 masters in the
+RESLab testbed: the OpenDNP3 and the SEL ‐ 3530 real ‐
+time automation controller (R T A C). Th e OpenDNP3 is a
+DNP3 master application with a command line interface
+that is used to remotely operate outstation devices . Th e
+SEL ‐ 3530 RT A C is a cyber ‐ physi cal component connected
+FIGURE 2 Timing diag ram for address resolution protocol cac he poisoning of the substation router ( SubRouter ) and DNP 3 Outstation prior to the MiTM
+attack to modify the DIRECT OPERATE CLOSE command
+FIGURE 3 The RESLab emulation ‐ based testbed architecture
+168
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nto the testbed that in this instance is being used as a DNP3
+master .
+� DNP3 Outstation – P ow erW orld Dynamic Studio (PWDS) is
+a real ‐ time simul ation engine for high v oltage po wer systems
+[ 28 ]. In this paper , w e use PWDS to simul ate the synthetic
+T exas 2000 ‐ bus model [ 22 ] as our exem plar pow er system.
+� Intrusion Detection System – Snort [ 29 ] is being used in
+RESLab as the r ule ‐ based, open ‐ source IDS . It is config-
+ured to g enerate alerts for ARP cach e poisoning and FDI
+attacks .
+� Storage and Visualization – The Elasticsearch, Logstash,
+and Kibana (ELK) [ 30 ] stack probes and stores all vir tual
+and ph ysical netw ork interfaces' traffic , in addition to storing
+all Snort alerts g enerated during each use case. Th is data can
+be queried using Lucene queries to perfor m in dept h visu-
+alization and cyber data cor relation.
+� Cyber‐Physical Resilient Energy Systems (CYPRES) Appli‐
+cation – CYPRES ag g rega tes infor mation, that is , from the
+cyber side CORE emulation envir onment, from the po wer
+side PWDS , as w ell as from the DNP3 masters regarding the
+communica tion status of DNP3 pac k ets . All these datasets
+are then analysed.
+The RESLab testbed components are hosted in different
+virtua l mac hines with the vSphere vir tualization platfor m, as
+illustrated in Figure 3 . In the middle, w e ha ve CORE which
+emulates a communication netw ork that allo ws the DNP3
+masters and outstation to interact. On the left side, CORE
+connects the utility control centre, where there is a DNP3
+master modelled using OpenDNP3 libraries and SEL ‐ R T A C.
+On the right side , CORE connects the DNP3 outstations
+r unning in PWDS .
+The netw ork topolog y of CORE is sho wn in detail in
+Figure 4 , where the OpenDNP3 master and SEL ‐ R T A C are
+connected to the CORE's netw ork through virtual port ens192 .
+T o emula te the outstations , the synthetic po wer system in
+PWDS is connected through virtua l por t ens224 . When the
+DNP3 communication link is not ARP cache poisoned, the
+traffic flows directly from ens192 to ens224 . How ever , when
+the adver sar y cac he poisons the DNP3 communication link, all
+traffic betw een the control centre and outstation passes
+through the adversary node , as shown by the dotted ar rows .
+4 | MiTM ATT ACKS ON DNP3
+In this section four different MiTM attack alg orithms are
+described. Each alg orithm is used in a different sequence to
+generate the FDI and FCI use cases .
+T able 2 shows the order in whic h each alg orithm is used
+for the four use cases .
+F or example, in Use Case 3, the adver sar y script calls Al-
+g orithms 3, 4, and 2. The function of each alg orithm is
+described in the proceeding parag raphs .
+4.1 | Scapy MiTM script
+The MiTM attac k scripts are prog rammed using the Scapy
+Project Python wrapper [ 12 ]. Scapy is a po w erful librar y that
+FIGURE 4 The RESLab testbed netw ork topolog y emulated in CORE. The ar rows show the data flows and vir tual mac hine interconnections for our use
+cases (Section 4 )
+TABL E 2 The sequence of function calls to the MiTM alg orithms for
+eac h use case
+Use case Sequence of function calls
+Use Case 1 Alg orithm 1
+Use Case 2 Alg orithm 2
+Use Case 3 Alg orithm 3 → Alg orithm 4 → Alg orithm 2
+Use Case 4 Alg orithm 3 → Alg orithm 4 → Alg orithm 2 → Alg . 4
+Abbreviation: MiTM, Man ‐ in ‐ The ‐ Middle.
+WLAZLO ET AL .
+-
+169
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\ncan modify frames and/or pac kets in real‐time. Th e librar y
+has many built‐in pac ket dissectors for applications using
+either user datag ram protocol or transmission control pro-
+tocol (TCP). Ho w ever , DNP3 is not one of the supported
+TCP applications . F ortunately , [31] introduces a Scapy
+extension for DNP3, whic h w e use to dissect and filter
+DNP3 pack ets .
+Here is how it w orks . Scapy reads all traffic sent to the
+adversary once the route is ARP cach e‐poisoned. Th en, the
+DNP3 extension along with Scapy's nativ e libraries filters
+traffic based on IP , TCP , and DNP3 header infor mation.
+F or instance, if the function code of a captured DNP3
+pac ket is (FC:05), it indicates an analogue or a binar y
+DIRECT OPERA TE command. Thus, the adversar y needs
+to ha ve its value modified before it forw ards the pac ket to
+the original destination. If the TCP pac ket does not ha ve a
+function code, it is not a DNP3 pac ket and the adversary
+only forw ards it to the destination. Thi s process is not as
+straightforw ard as it may seem. First, the total process m ust
+be optimized to take the least amount of processing time as
+possible. Second, the DNP3 traffic is filtered by function
+code and then by control code to deter mine if the pa yload
+is an analogue or binar y command. Thi rd, in order to keep
+the operator una w are that the wrong command has been
+sent to the outstation, the ackno wledgement number of each
+DNP3 command pac ket is used to filter the appropriate
+response pack et that is c hanged to matc h the original
+command sent by the control centre .
+4.2 | Binar y operate
+Substation break ers are re presented by binar y points (BI or
+BO) that can ha v e their states updated remotely by DNP3
+binar y DIRECT OPERA TE pack ets . Each point can either be
+opened (tripped) or closed. Th e TRIP action will disconnect or
+de‐energize a line, a CLOSE will energize an open a line. The
+MiTM script inv erts the binar y command. In other w ords , a
+TRIP command is forced to a CLOSE command, or vice‐
+ver sa.
+Alg orithm 1 describes the process to inv er t a binar y
+DIRECT OPERA TE pack et. After a recei ved pack et
+(recv_pkt) is identified as a DNP3 binar y DIRECT
+OPERA TE pack et, its TCP header che cksum is remov ed,
+because Scapy automatically recalculates the TCP header
+c hecksum if there is not one detected when forwarding the
+frame. Th e recv_pkt's ackno wledgem ent num ber is stored as
+binary_operate_ack, so the response pack et can be c hange d
+to the original binar y val ue. Th en, the DNP3 header is
+stored as dnp_header. Th e same is done for the pac ket's
+pa yload or dnp_pl. Next, the pa yload is bisected around the
+control code, as in Figure 1. Th e first half of the pa yload is
+stored under the dnp_front. Th e second half is stored under
+the dnp_end. If the pack et's control code is a CLOSE
+command (‘41’), it is modified to be a TRIP command
+(‘81’), or vice‐ve rsa.
+Algorithm 1 MiTM attack on binar y control
+commands
+function modify_binary_direct_operate(recv_pkt)
+binary_operate_ack = recv_pkt[TCP].ack
+mod_pkt = recv_pkt[TCP]
+Delete mod_pkt.checksum
+dnp_header = mod_pkt.pl[: dnp_hdr_size]
+dnp_pl = mod_pkt.pl[dnp_hdr_size:]
+dnp_front = mod_pkt.pl[dnp_hdr_size: bin_loc]
+dnp_end = mod_pkt.pl[bin_loc + 1:]
+dnp_mid = mod_pkt.pl[bin_loc]
+if dnp_mid == b
+0
+\x41’ then dnp_mid = b
+0
+\x81
+0
+else dnp_mid = b
+0
+\x41
+0
+end if
+merged_pl = Join[dnp_front, dnp_mid, dnp_end]
+pl_with_crc = update_crc_payload(merged_pl)
+mod_pkt.pl = Join[dnp_header, pl_with_crc]
+mod_pkt = send_to_outstation(mod_pkt)
+return mod_pkt, binary_operate_ack
+end function
+Th en, the DNP3 payload is reassembled by joining the
+dnp_front, dnp_mid, and dnp_end together as merged_pl.
+The reassembled pa yload is passed to the update_crc_payload
+function, whic h comes from the DNP3 Scapy extension [31].
+Finally , the MA C address in the frame's header is updated to
+the MA C address of the outstation, and the adversary forw ards
+the frame to the outstation.
+4.3 | Analogu e direct operate
+The setpoints of g enerators and other controls are re pre-
+sented by analogue points (AI or AO) in the DNP3 pro-
+tocol. Each setpoint can be v aried b y the DNP3 master . In
+the MiTM script, any analogue DIRECT OPERA TE set-
+point is forced to a low er v alue. The low er val ue ramps
+do wn the g enerator without tripping it. Alg orithm 1 inv er ts
+the control code for a binar y DIRECT OPERA TE com-
+mand. Alg orithm 2 c hang es analogue v alues instead of bi-
+nar y val ues . The main difference betw een the tw o
+alg orithms is dnp_mid whic h is an analogue val ue that is
+modified in Alg orithm 2. Th e analogue v alue is a four‐octet
+float val ue that is encoded with a one‐octet control status .
+In the update_new_val() function, the analogue value in the
+original recv_pkt is c hang ed to a forg ed v alue. Once the
+forged v alue is placed in the cor rect position, the DNP3
+pa yload CRC , TCP header c hec ksum, and the MA C address
+are updated before the pack et is forw arded to the outstation.
+Algorithm 2 MiTM attack on analogu e control
+commands
+1: function modify_analog_direct_operate(recv_
+pkt)
+2: analog_operate_ack = recv_pkt[TCP].ack
+3: mod_pkt = recv_pkt[TCP]
+170
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\n4: Delete mod_pkt.checksum
+5: dnp_header = mod_pkt.pl[: dnp_hdr_size]
+6: dnp_pl = mod_pkt.pl[dnp_hdr_size:]
+7: dnp_front = mod_pkt.pl[dnp_hdr_size:
+alg_loc]
+8: dnp_end = mod_pkt.pl[anlg_loc + 5:]
+9: dnp_mid = mod_pkt.pl[anlg_loc + 1:
+anlg_loc + 5]
+10: dnp_mid = update_new_val(dnp_mid)
+11: merged_pl = Join[dnp_front, dnp_mid, dnp_end]
+12: pl_with_crc = update_crc_payload(merged_pl)
+13: mod_pkt.pl = Join[dnp_header, pl_with_crc]
+14: mod_pkt = send_to_outstation(mod_pkt)
+15: return mod_pkt, analog_operate_ack
+16: end function
+4.4 | P olled measurement snif f and store
+T o target the intended DNP3 pac ket, the MiTM script must
+first sniff through all the netw ork traffic betw een the sub-
+station g atewa y and PWDS . Then, each pac ket the MiTM
+script recei ves is filtered by its function code. F or ev er y fifth
+pac ket with a DNP3 function code of ‘81’, the analogue and
+binar y data val ue is stored in the adversary 's mac hine. Not
+every read response pac ket is stored since the processing time
+for these pack ets is relativ ely high and w ould lead to more
+retransmitted pac kets .
+Alg orithm 3 describes how the read response pack ets are
+stored in a dnpDatabase. A DNP3 response payload for poll
+request consists of collection of the DNP3 points stored in the
+data chunks with the chunk_size of 18 byt es (16 bytes of
+pa yload and tw o byt es of CRC ). First, the pack et data dnp_pl is
+c heck ed to see if it contains one or more datachunks. F or the
+pa yload with at least one datachunk, each dnp_chunk's CRC is
+remov ed and its contents are concatenated into contiguous
+byt es of BI, AI, BO, and AO points . Then, based on the header
+infor mation bi_hdr, ai_hdr, bo_hdr, ao_hdr, the num ber of
+DNP3 points under each categ or y bi_count, ai_count,
+bo_count, ao_count is extracted. The infor mation suc h as the
+pointIndex, value, chunkIndex, pointType of each DNP3
+point is stored in a dnpDatabase classified by the source
+address of the pac ket, which is unique to each outstation
+num ber . Th e pointIndex stores the actual DNP3 index. The
+value stores the v alue associated with the DNP3 point. The
+pointType indicates the type of the DNP3 point. The purpose
+of storing chunkIndex is to identify the location of the DNP3
+point in the datachunks. Th ese attributes are further used by
+the intr uder in Alg orithm 4 to modify the measurement in a
+specific location, whic h results in a faster modification of the
+DNP3 pa yload.
+Algorithm 3 MiTM attack on sniffing measurements
+1: function sniff_read_response(recv_pkt,
+outstation)
+2: mod_pkt = recv_pkt[TCP]
+3: Delete mod_pkt.checksum
+4: dnp_header = mod_pkt.pl[: dnp_hdr_size]
+5: dnp_pl = mod_pkt.pl[dnp_hdr_size:]
+6: chunk_size = 18
+7: dnp_chunks = len(dnp_pl)/chunk_size
+8: if dnp_chunks == 0 then
+9: send_to_master(mod_pkt) return mod_pkt
+10: end if
+11: Store each data chunks in dnp_chunks_pl
+12: dnp_pl_without_crc = Remove 2 bytes of CRC from
+each dnp_chunks_pl
+13: dnp_reassembled = Join(dnp_pl_without_crc)
+14: Obtain bi_hdr, bi_pl, ai_hdr, ai_pl, bo_hdr,
+bo_pl, ao_hdr, ao_pl using bi_count,
+ai_count, bo_count, ao_count
+15: Obtain start and end index for BI, AI, BO, AO
+group types
+16: Store DNP3Points for each point types
+17: Create dnpDatabase for outstation using each
+point in DNP3Points for BI, AI, BO, AO types
+return dnpDatabase
+18: end function
+4.5 | Polle d measurements modification
+P eriodically , the master polls each outstation that is connected
+to it for updates on the binar y and analogue points . In the
+RESLab testbed, the polling inter v al varies from 30 to 60 s .
+When polled, an outstation responds with a list of all the binar y
+and analogue points housed within that outstation. There are
+m ultiple wa ys this data can be manipulated. F or instance, the
+poll measurements can be spoofed to a wrong val ue, causing
+the operator to send the incor rect command to the outstation.
+Or these updates can be forge d so the operator will c hoose not
+to send a command to an outstation, when he/she should.
+Algorithm 4 MiTM attack on modifying
+measurements
+1: function modify_read_response(dnpDatabase,
+ModPoints)
+2: mod_pkt = recv_pkt[TCP]
+3: Delete mod_pkt.checksum
+4: for dnp3Point in ModPoints do
+5: dnp_header = mod_pkt.pl[: dnp_hdr_size]
+6: dnp_pl = mod_pkt.pl[dnp_hdr_size:]
+7: if dnp3Point.pointType is BI _ BO then
+8: bin_loc = using dnp3Point.chunkIndex and
+dnp3Point.pointIndex
+9: Follow steps 7 to 15 in Algorithm 1
+10: end if
+11: if dnp3Point.pointType is AI _ AO then
+12: anlg_loc = using dnp3Point.chunkIndex
+and dnp3Point.pointIndex
+13: if len(dnp3Point.chunkIndex) > 1 then
+14: Process the dnp3Point.chunkIndex [0]and
+dnp3Point.chunkIndex [1]separately
+15: end if
+16: if len(dnp3Point.chunkIndex) == 1
+then
+17: Follow steps 7 to 14 in Algorithm 2
+18: end if
+19: end if
+WLAZLO ET AL .
+-
+171
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\n20: end for
+21: mod _ pkt = send _ to _ master ( mod _ pkt )
+22: return mod _ pkt
+23: end function
+The dnpDatabase containing all the datapoints captured in
+Alg orithm 3 is passed to the modify _ read _ response () function,
+shown in Alg orithm 4. A list of BI , BO , AI , and AO points
+that the MiTM attack intends to use are contained in the
+varia ble ModPoints that is passed to the function. Each point
+listed in ModPoints is modified in the dnpDatabase , and the
+CRC for eac h datachunk is updated. BI and BO points ha v e
+only one ‐ octet and therefore can be contained in one data‐
+chunk (lines 7–10 in Alg orithm 4). How ever , AI and AO are
+five octets long and can be split between tw o datac hunks (lines
+11–19 in Alg orithm 4). Each datachunk that is modified must
+ha ve its CR C recalculated for the master to acce pt the pac ket.
+4.6 | Acknowledgements modification
+After a binar y or analogue DIRECT OPERA TE pac ket is
+receiv ed at an outstation, a DNP3 ackno wledgem ent pack et is
+retur ned stating the action w as perfor med. When the MiTM
+script changes the binar y or analogue command or val ue to
+perfor m an incor rect action, the outstation's response is a
+telltale sign that the DNP3 communication c hannel is
+compromised. F or the MiTM to remain unnoticed by the
+control centre's operator , the DNP3 ackno wledgem ent from
+the outstation m ust be modified.
+F or example, when the operator sends a binar y CLOSE
+command, the MiTM scrip c hanges the command to a binar y
+TRIP and then forw ards it to the outstation. Cor respondingly , in
+the ackno wledgeme nt, the outstation sends a binar y response
+stating that the break er is opening . The intr uder then modifies
+the tr ue response into a binar y CLOSE response and forw ards it
+to the operator . Th is leav es the DNP3 master una ware that the
+wrong action has been sent to the outstation. In this wa y , Al-
+g orithm 1 modifies the binar y operate response pack et. Similarly ,
+Alg orithm 2 modifies the analogue operate response pack et.
+4.7 | Graphical user interface for MiTM
+attacks
+T o simplify the execution of each use case of T able 2 , w e
+designed a g raphical user interface (GUI) using Python's
+Tkinter libraries [ 32 ]. Th e GUI allows a user to specify the
+g atewa y , the IP addresses of the outstation and DNP3 master ,
+and whic h use case to r un. Once the user mak es the selections
+and presses the Enter button, as shown in Figure 5 , the route is
+ARP cache ‐ poisoned and the MiTM prog ram starts sniffing
+traffic . It modifies the DNP3 traffic according to the c hosen
+use case. While r unning, the textbox at the bottom displa ys
+where the pac kets are coming from and whic h val ues ha v e
+been c hang ed. T o help debug the application or the netw ork
+setup , the textbox also displays any er rors that may occur . Th e
+MiTM prog ram r uns until the user clicks the Stop button.
+When it is pressed, both the g atewa y and outstation retur n to
+their previous configuration and the traffic flows between the
+gatewa y and DNP3 master as before the attac k.
+5 | SNOR T CONFIGURATION FOR
+MiTM ATT ACK
+It is essential for utility companies to monitor and secure their
+netw orks from various for ms of cyber threats . Generally , this
+comes in the for m of an IDS that can detect vulnerabilities in a
+netw ork and generat e alar ms . Snort is a open ‐ source IDS [ 29 ]
+that can be configured to dissect Ethern et pack ets to monitor
+for a variet y of attacks . Each type of attack has a pre ‐ processor
+whic h can be enabled in the Snort's configuration file . Th en,
+r ules based on the data the pre ‐ processors collects are created
+to g enerate aler ts . Th e alerts can be displa yed in real ‐ time or
+sa ved to a file.
+During each trial, Snort is r unning in the substation
+gatewa y or SubRouter (IP: 192.168.0.4), shown in Figure 4 .
+The Snort ARP and DNP3 pre ‐ processors are used. In the
+Snort configuration file , the MA C addresses of the SubRouter
+and DNP 3 Outstation (IP: 192.168.0.5) are white ‐ listed
+(Listing 1), where a list of known IP addresses and their
+MA C addresses within a LAN is maintained by Snort [ 33 ]. Th is
+allo ws it to detect if the MA C address has c hang ed from the
+listed IP address , which indicates an attempt to poison the
+ARP table of the router . Th e DNP3 pre ‐ processor (Listing 2)
+detects a DNP3 pac ket and c hec ks if the CRC is cor rect; if not,
+an alert is g enerated. The pre ‐ processor is configured to detect
+when a DNP3 DIRECT OPERA TE pack et is sent.
+Listing 1: ARP pre ‐ processor enabled in Snort configura-
+tion file
+preprocessor arpspoof_detect_host:
+↪ 192.168.0.4 00:00:00:aa:00:02
+preprocessor arpspoof_detect_host:
+↪ 192.168.0.5 00:50:56:9c:9d:70
+FIGUR E 5 Graphical User Interface used in the RESlab testbed to
+launc h eac h Use Case
+172
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nListing 2: DNP3 pre‐processor enabled in Snort configu-
+ration file
+preprocessor dnp3: ports {20000}
+memcap 262144 \
+check_crc
+With the pre‐processors enabled, custom r ules are created.
+R ules are added to g enerate logs that can be used to alert the
+operator . The first three alerts, R1, R2, and R3, indicate an
+ARP cach e poisoning . The next tw o alerts, R4 and R5, notify
+when a DNP3 DIRECT OPERA TE pac ket is sent to the
+outstation.
+Listing 3: ARP and DNP3 specific aler ts configured in
+Snort
+R1 alert (msg: “
+↪ ARPSPOOF_ETHERFRAME_ARP_MISMATCH_SRC”
+↪ ; sid: 2; gid: 112; rev: 1; metadata:
+↪ rule−type preproc; classtype: bad−
+↪ unknown;)
+R2 alert (msg: “
+↪ ARPSPOOF_ETHERFRAME_ARP_MISMATCH_DST”;
+↪ sid: 3; gid: 112; rev: 1; metadata:
+↪ rule−type preproc; classtype: bad−
+↪ unknown;)
+R3 alert (msg: “
+↪ ARPSPOOF_ARP_CACHE_OVERWRITE_ATTACK”;
+↪ sid: 4; gid: 112; rev: 1; metadata:
+↪ rule−type preproc; classtype:bad−
+↪ unknown;)
+R4 alert tcp $EXTERNAL_NET any −>
+↪ 192.168.0.5 20000 (msg: “DNP3_Snort_
+↪ DIRECT_OPERATE”; flow:established,
+↪ to_server; dnp3_func: direct_operate;
+↪ sid:123000;)
+R5 alert tcp $EXTERNAL_NET any −>
+↪ 192.168.0.5 20000 (msg:"DNP3_Snort_
+↪ OPERATE”; flow: established, to_server;
+↪ dnp3_func: operate; sid:123002;)
+6 | RESUL TS AND AN AL YS IS
+Th is section briefly describes the experiment setup in the
+RESLab testbed, then presents the results of four MiTM use
+cases . In addition, w e sho w ho w Snort alerts can be used to
+detect the MiTM attack. Snort is operating in a Netw ork
+Intr usion Detection System mode at the substation router ,
+protecting the substation's LAN .
+6.1 | Experimental setup
+As shown in RESLab testbed in Figure 3, the DNP3 master
+and the SEL RT A C are connected through vSphere's control
+centre virtua l local area netw ork (VLAN) to the CORE
+emulato r . The DNP3 outstations , modelled in PWDS , are
+connected through vSphere's substation VLAN to the
+CORE netw ork. In most kno wn cyber attacks on an ICS
+netw ork, the intr uder had to perfor m mult i‐stage intr usions
+to reach the targ eted g rid components . Since this w ork fo-
+cuses on the dynamics of MiTM attacks , the prior stages do
+not pla y a major role. Hence, we assume the intr uder , after
+a reconnaissance stage, has remote access to one of the
+computer nodes in the substation LAN , whic h in this
+instance is the adver sar y node.
+6.2 | Ev aluation metrics
+The strength of the MiTM attac k is deter mined b y analysing
+the av erage round trip time (RTT), retransmission rate, and
+a ver age processing time of DNP3 pac kets , as described
+belo w .
+6.2.1 | Retransmission rate
+When a TCP pac ket is sent, the sender starts a v ariable‐length
+retransmission timer , and waits for the ackno wledgem ent. If it
+does not receiv e an ackno wledge ment before the timer expires ,
+the sender assumes the pac ket is lost and retransmits it. During
+the MiTM attac k, the num ber of retransmissions increases ,
+because pack ets may not be successfully forw arded to the
+outstation and the DNP3 master may not recei ve the
+ac knowl edg ement. Th is may also happen if the adversar y
+cannot forw ard the ac knowledgement it receiv es from the
+outstation. Since the duration of each use case varies ,
+retransmission rate is used as a metric instead of the numbe r of
+retransmissions . Th e retransmission rate R
+R
+is computed using
+Equation (1),
+R
+R
+¼ N
+R
+=T
+R
+ð1Þ
+where N
+R
+is the num ber of retransmitted pac kets during the
+MiTM, and T
+R
+is the time inter v al betw een the first and the last
+retransmitted pac k et in seconds .
+6.2.2 | A ver ag e round trip time
+The round trip time (RTT) can be seen in the time diag ram in
+Figure 2. It includes the netw ork's propag ation delay due to the
+distance between nodes , the added transmission delays as the
+pac k et trav els through the adversar y node, and the processing
+time the adv ersar y take s to modify the commands and
+response . Hence, we ev aluate the impact of a MiTM attac k on
+the RTT .
+6.2.3 | Processing time
+The processing time depe nds on the type of DNP3 traffic
+the intr uder modifies . The processing time for modifying
+WLAZLO ET AL .
+-
+173
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\noutstation polled responses can v ar y based on the outstation
+data that is polled. The outstation's read response dep ends on
+the n umber of DNP3 points housed at a par ticular
+outstation.
+The retransmission rate and a ver age RTT are extrapolated
+by analysing Wireshark pack et captures (PCAP) data from the
+SubRouter's netw ork interface. Th e processing delay is auto-
+matically calculated b y the MiTM attac k script.
+6.3 | Modifying measurements and
+commands
+Th e objectiv e of the intr uder is to disr upt g rid operations .
+Details on the sequence of actions that create the FCI and FDI
+attacks and ho w they impact the physic al components of the
+pow er system are presented in detail in [26]. Here in this paper
+w e focus on the impact of the attacks on the communication s
+netw ork, or cyber telemetr y . Th ese are our four use cases:
+6.3.1 | Use Case 1: Branch Control
+modifications
+Each binar y DIRECT OPERA TE command is c hange d from
+a CLOSE to a TRIP command, with any other traffic simply
+forw arded. Th e c hange in the binar y operate command in-
+troduces some processing delay , whic h may cause the pack et to
+be retransmitted.
+6.3.2 | Use Case 2: Generator set‐point
+modification
+When the MiTM script is r unning, the analogue point for the
+g enerator is set to a low er val ue, in some cases 20 MW , which
+will decrease the g enerator setpoint from its cur rent val ue
+down to 20 MW .
+6.3.3 | Use Case 3: Measurement and status
+modification
+Use Case 3 is a combination of FCI and FDI attacks . After
+each polling inter v al, the DNP3 master will send a read request
+pac ket to each outstation, which then sends a read response
+pac ket back to the master . This read response is filled with the
+all the binar y input, analogue input, binar y output, and
+analogue output DNP3 points . Next, analogue input points in
+the read response pack et are changed to a low er val ue low er of
+20 or 0 MW . Th e operator controlling the DNP3 master is then
+forced to send an analogue DIRECT OPERA TE command to
+bring the g enerators back to their original loaded set points .
+Ho wev er , when the operator sends this original set point val ue
+to the generat or , the MiTM script is prog rammed to c hange
+the setpoint to 20 or 0 MW .
+6.3.4 | Use Case 4: measurement and status
+modification
+The adversar y first follows the ste ps of Use Case 3, then
+modifies the read response pack et of the preceding pac kets ,
+based on the actual set point giv en b y the master . Th us , the
+master is una w are of the contingency created.
+6.4 | Use cases implementation
+F or eac h use case, we alter the polling inter v als and the numbe r
+of polled DNP3 outstations . The polling inter val s tested w ere
+30 and 60 s , while the number of polled DNP3 outstations
+w ere 5 and 10. F or instance , the scenario UC1 10 OS 30 means
+that w e implemented Use Case 1 with 10 outstations and a
+polling inter val of 30 s . In each scenario , the nor mal operation
+is conducted first without the MiTM attac k. Then, the opera-
+tion is conducted agai n with the attack to analyse its impact.
+Finally , the attack is stopped and the netw ork restored.
+Th e main reason for choosing polling inter vals of 30 and
+60 s is that most DNP3 masters hav e polling rates of 30 s ,
+1 min, or 5 min, with a maxim um of 15 min. A polling inter v al
+of more than tw o minutes has little impact on attack strength
+because the adversar y processing time is less than 60 to 70 ms
+(see Section 6.7).
+Similarly , we c hoose outstation num bers of 5 and 10 since
+our objecti ve is to study the communication dynamics of an
+impacted outstation, and ho w the number of outstations be-
+comes a limitation on the attac k success probability . Th e
+n umbers of 5 and 10 coincide with our use cases in the T exas
+2000‐bus model where each utility control centre communi-
+cates with at least tw o and at most 25 substations . Because the
+RESLab testbed uses CORE, whic h is an emulator and not a
+sim ulator , there are practical limitations to the number of
+substations that can be modified by the MiTM script. Th is
+n umber in our testbed is about 50 substations; how ever , this
+depends on the amount of memor y and capacity of the
+netw ork interface card's buffer that is allocated to CORE.
+Since CORE is an em ulator , it demonstrates more realistically
+the ph ysical limitations an actual adversary w ould ha ve to
+experience in order to create a successful MiTM attack.
+6.5 | Impact of polling rates and number of
+outstations on retransmission
+High polling rates , or low polling inter val s , result in pac ket losses
+during an attack due to the limitations of an adver sar y's resources
+to process all the command and response DNP3 traffic . Hence,
+w e study the impact of polling rates on the numbe r of retrans-
+missions . Figure 6 shows the impact of different scenarios on the
+retransmission rate. Scenarios with 60 s polling inter vals result in
+less retransmissions in comparison to 30 s scenarios . F or
+example , in UC1 10 OS 30 the retransmission rate is almost four
+times that of UC1 10 OS 60.
+174
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nNote that the UC 1 5 OS 30 and UC 1 5 OS 60 are not
+included in Figure 6 , because Use Case 1 requires eight or
+more outstations to ha ve their binar y operate pac kets inv erted
+in order to generate a cascading failure in the T exas 2000 ‐ bus
+topolog y .
+The num ber of DNP3 outstations polled also affects the
+amount of traffic the intr uder is required to process . A larg er
+num ber of outstations causes more traffic . The netw ork buffer
+temporarily stores incoming pac kets before they are processed.
+Due to the limitation on the buffer size , the intr uder may not
+be able to process all the traffic that tra ver ses through it, which
+results in some attac ks failing . Hence, the n umber of retrans-
+missions increases . F or example, from Figure 6 w e can obser v e
+the retransmission rate for UC 2 10 OS 30 with 10 polled
+outstations is almost 2.5 times that of the UC 2 5 OS 30 case
+with five polled outstations .
+6.6 | Impact on a v era ge R TT
+Th e RTT can be an indicator that an intr uder is intercep ting
+netw ork traffic . RTT is also affected b y the num ber of out-
+stations polled and how often eac h is being polled. Figure 7
+shows the DNP3 pack ets that resulted in a high RTT and had
+to be retransmitted for different use cases . Th e majority of the
+DNP3 traffic is recei ved before the retransmission timer ex-
+pires , sho wn by the dashed ‐ line. The dashed ‐ line sho ws the
+cut ‐ off time for the DNP3 retransmission timer , whic h w as set
+to 7.0 s . W e ha ve obser ved that there is a longer dela y when 10
+outstations are polled, compared with the num ber of retrans-
+missions for the scenarios with five outstations .
+6.7 | Processing time by pack et type
+Th e processing time at the adver sar y node is different for each
+pac ket type , as shown in Figure 8 , where w e measure the
+a ver age time to forw ard pack ets between the substation
+gatewa y and outstation by pac ket type. Th e low est forwarding
+time and therefore most difficult pac ket type to detect the
+MiTM attac k w ere the bypas s pack ets , which took 22.775 ms to
+process . In the byp ass pac k ets , the adversary only modifies the
+source and destination MA C addresses of the frame . Next, the
+a ver age processing time for an analogue DIRECT OPERA TE
+pac k et is higher at 27.693 ms , follow ed by binar y DIRECT
+OPERA TE taking an a verage of 30.217 ms . Th e highest
+processing time is for the read response pac k ets , whic h take an
+a ver age of 35.415 ms .
+Th e processing time is directly cor related to the amount of
+traffic and the num ber of operations the MiTM script has to
+perfor m on each pac k et. F or this reason, the b ypass traffic
+took the least amount of time , as the adv ersar y only updates
+the MA C address and forwards it to the original destination.
+Next, the operations to the binar y and analogue DIRECT
+OPERA TE pac kets include modifying the v alue sent by the
+operator , recalculating the CRC , and forwarding the forg ed
+pac k et to the outstation. The read response pac kets take the
+most number of operations: tw o to three analogue/binar y
+FIGURE 6 R etransmission rate of DNP3 traffic for eac h scenario
+FIGUR E 7 R ound trip time for DNP3 traffic for each scenario
+FIGUR E 8 A verage processing time by pack et type at the adversary
+node
+WLAZLO ET AL .
+-
+175
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nval ues are modified, then the CRC for m ultiple data block s are
+calculated and updated, and the pac ket is forw arded to the
+master .
+6.8 | Snor t detection
+In the RESLab testbed, the Snort logs and alerts are collected
+by Logstash, an open source tool that is used with Kibana to
+create dashboards for data analysis and visualization. After the
+Snort log data is processed by Kibana, the frequency of the
+ARP and DNP3 alerts show whic h DNP3 pac kets are being
+compromised at what time .
+During each use case, the PCAP data containing unsolic-
+ited ARP and DNP3 traffic , and the Snort's aler t log files are
+collected by Logstash, which filters and for mats the data. Then,
+as sho wn in Figure 9 , the data is stored in the Elasticsearch
+database . Kibana acts as the front ‐ end for the Elasticsearch
+database , by allowing us to create g raphs that show the cor-
+relation betw een Snort aler ts , ARP frames , and DNP3 pack ets .
+T o illustrate what is displayed in RESLab testbed's dash-
+board, Figure 10 shows the ARP aler ts that are generated when
+an ARP cache poisoning is detected based on the r ules R 1, R 2,
+and R 3, illustrated in Listing 3 in Section 5 . In addition, DNP3
+alerts are g enerated when DNP3 DIRECT OPERA TE pac kets
+are detected as per R 4 and R 5 r ules .
+W e can conclude that during the time ‐ period an ARP
+spoof is detected, the DNP3 DIRECT OPERA TE pack et is
+rerouted to the adversary 's node, which indicates that the
+MiTM script is modifying the operation. By monitoring the
+RESLab's dashboard, it is possible to deter mine with a one ‐
+min ute resolution which DNP3 pac k ets are potentially
+compromised and should be discarded. Th e one ‐ minute in-
+ter val s that contain the DNP3 pack ets that should be discarded
+are sho wn by the blue lines in Figure 10 .
+7 | CONCLUSION
+Non ‐ stealth y MiTM attacks can be develop ed and detected
+from features such as CRC mismatc h, ackno wledgem ents , and
+round trip times . How ever , if the intr uder is stealth y enough to
+forge the CRC s , modify the ackno wledge ment pac kets , and
+reduce processing time by modifying selected DNP3 points in
+a pa yload, it can be difficult to detect suc h FDIs or FCIs .
+Th is paper presented an automated tool that allows us to
+assess different cyber attac k scenarios based on MiTM in-
+tr usions . W e described this framew ork with step ‐ b y step al-
+g orithms in Section 4 , including a g raphical user interface to
+help users r un different use cases . Additionally , w e introduced
+a method to detect MiTM attac k traffic by cor relating Snort
+IDS alerts with ARP and DNP3 pack et data, using netw ork
+metrics such as retransmission rate and av erag e RTT . It is
+important to monitor these metrics to detect the signature of a
+MiTM attack. Th e processing time at the adversary causes the
+RTT to increase, and the increased RTT causes
+FIGURE 9 Data flow pipeline for Kibana data processing and g raph
+generation
+FIGURE 10 Address resolution protocol and Distributed Netw ork Protocol ‐ 3 Snort alerts show potentially compromised DNP3 pack ets
+176
+-
+WLAZLO ET AL .
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License
+\nretransmissions . Th ese causal behav iours can be extracted in
+the for m of timestamped features for training mac hine‐
+learning ‐based detection alg orithms .
+Our results show that as the numbe r of polled outstations
+increases , the DNP3 pack ets are delaye d, and the efficiency of
+the MiTM attac k decreases . Thi s causes more DNP3 retrans-
+missions , because consecutiv e pack ets from different out-
+stations ar riv e at the adversar y faster than the MiTM script can
+modify and forw ard the first pac ket. Also , w e obser ve different
+processing times at the adversar y for different types of DNP3
+traffic . R ead response pack ets had the longest processing time .
+Th en, based on these results , w e present defence recommen-
+dations such as sho wing ho w cyber telemetr y can be used to
+detect stealth y MiTM attac ks . R esults show that while r ule‐
+based IDS such as Snort can detect ARP spoofs using exist-
+ing pre‐processors , they can still result in higher false positiv es
+due to r ule selection criteria. Hence, this w ork also prov ides
+recommendations for future w ork to incor porate metrics such
+as a verage RTT and retransmission rate into security‐centric
+data analysis on anomaly based attac k detection.
+ACKNOWLEDGEM ENTS
+Th is research is suppor ted by the US Depar tment of Energ y's
+(DoE) Cybersecurity for Energ y Deli very Systems prog ram
+under aw ard DE‐OE0000895.
+ORCID
+Abhijeet Sahu
+ https://orcid.org/0000-0002-7647-3758
+Ana Goulart
+ https://orcid.org/0000-0001-7184-7485
+REFERENCES
+1. Fritz, J .J ., et al.: Simulation of man in the middle attack on smart g rid
+testbed. In: 2019 SoutheastCon, pp . 1–6 (2019)
+2. Langner, R.: Stuxnet: dissecting a cyberwarfare weap on. IEEE Security &
+Priv acy. 9 (3), 49–51 (2011)
+3. Lee, R.M., Assante, M.J ., Conwa y, T .: Analysis of the cyber attack on the
+Ukrainian pow er g rid: defense use case by SANS ICS . https://ics .sans .
+org/media/E‐ISA C\_SANS\_Ukraine\_DUC\_5.pdf
+4. Liang, G ., et al.: The 2015 Ukraine black out: implications for false data
+injection attacks . IEEE T ransactions on P ow er Systems. 1–1, 11 (2016)
+5. T argett, E.: High voltage attack: EU's pow er g rid organisation hit by
+hack ers . (2020). [Online]. A vailable: https://www .cbronline .com/news/
+eu-pow er-grid-org anisation-hack ed
+6. Kundu, A., et al.: A3d: Attention‐based auto‐encoder anomaly detector
+for false data injection attacks . Elect P ow er Syst R es. 189, 106795 (2020).
+[Online]. A vailable: http://www .sciencedirect.com/science/artic le/pii/
+S0378779620305988
+7. Y uan, Y ., Li, Z., R en, K.: Modeling load redistribution attacks in pow er
+systems . IEEE T ransactions on Smart Grid. 2 (2), 382–390 (2011)
+8. W ang, W ., Lu, Z.: Cyber security in the smart g rid: sur vey and challenges .
+Comput Netw ork. 57, 1344–1371 (2013)
+9. Liu, R., et al.: Analyzing the cyber‐physical impact of cyber events on
+the pow er g rid. IEEE T ransactions on Smart Grid. 6 (5), 2444–2453
+(2015)
+10. Kezuno vic, M., et al.: The use of system in the loop , hardware in the
+loop , and co‐modeling of cyber‐phy sical systems in developing and
+evaluating new smart g rid solutions . In Proceedings of the 50th Haw aii
+Inter national Conference on System Sciences (2017)
+11. Ashok, A., et al.: Experimental evaluation of cyber attacks on automatic
+g eneration control using a cps security testbed. In: 2015 IEEE P ow er &
+Energ y Society General Meeting, pp . 1–5. IEEE (2015)
+12. Burns, B ., et al.: Security P ow er T ools. O’R eilly Media, Inc . (2007)
+13. Chen, B ., et al.: Implementing a real‐time cyber‐physical system test bed
+in rtds and opnet. In: 2014 North American P ow er Symposium (NAPS),
+pp . 1–6 (2014)
+14. Y ang, Y ., et al.: Man‐in‐the‐middle attack test‐bed inv estig ating cyber‐
+security vulnerabilities in smart g rid scada systems . In: International
+Conference on Sustainable P ow er Generation and Supply (SUPER GEN
+2012), pp . 1–8 (2012)
+15. Y ang, Y ., et al.: Multidimensional intr usion detection system for iec
+61850‐based scada netw orks . IEEE T rans P ow er Deliv. 32 (2), 1068–1078
+(2017)
+16. Oyewumi, I.A., et al.: Isaac: the Idaho cps smart g rid cybersecurity
+testbed. In: 2019 IEEE T exas P ow er and Energ y Conference (TPEC),
+pp . 1–6 (2019)
+17. Darwish, I., Saadawi, T .: Attack detection and mitig ation techniques in
+industrial control system ‐smart g rid dnp3. In: 2018 1st International
+Conference on Data Intelligence and Security (ICDIS), pp . 131–134 (2018)
+18. Lu, X., et al.: On netw ork perfor mance evaluation tow ard the smart g rid:
+a case study of dnp3 ov er tcp/ip . In: 2011 IEEE global telecommuni-
+cations conference – GLOBECOM, pp . 1–6 (2011)
+19. Zhang, Z., et al.: An eve nt‐trig gered secondar y control strateg y with
+netw ork delay in islanded microg rids . IEEE Systems J ournal. 13 (2),
+1851–1860 (2019)
+20. Zhang, Z., et al.: Delay‐tole rant predictiv e pow er compensation control
+for photov oltaic voltage regulation. IEEE T ransactions on Industrial
+Infor matics. 17 (7), 4545–4554 (2021)
+21. Birc hfield, A.B ., et al.: Grid str uctural characteristics as va lidation criteria
+for synthetic netw orks . IEEE T rans P ow er Syst. 32 (4) (2017)
+22. Wlazlo, P ., et al.: A cyber topolog y model for the T exas 2000 synthetic
+electric pow er g rid. In: 2019 Principles , Systems and Applications of IP
+T elecommunications (IPTComm), pp . 1–8 (2019)
+23. Clarke, G ., R eynders, D ., W right, E.: Practical Modern SCAD A Pro-
+tocols: DNP3, 60870.5 and R elated Systems. Newnes (2004)
+24. DNP Function Code Descriptions , 2020. [Online]. A vailable: https://
+www .proface.com/support/index?pag e=content&countr y=APS_GLO
+B AL&lang=en&locale=en_US&id=F A222356&prd=
+25. R osborough, C., Gordon, C., W aldron, B .: All about eve: comparing
+DNP3 secure authentication with standard security technologies for
+SCAD A communications . In: 13th A ustralasian Infor mation Security
+Conference, vol. 161 (2019)
+26. Sahu, A., et al.: Design and evaluation of a cyber‐phy sical resilient pow er
+system testbed. (2020). [Online]. A vailable: http://arxiv .org/abs/2011.
+13552
+27. Ahrenholz, J ., et al.: Core: a real‐time netw ork emula tor . In: MILCOM
+2008 – 2008 IEEE Militar y Communications Conference, pp . 1–7 (2008)
+28. Glov er, T .: Overb ye, and sar ma, ‘po werw orld simulator’. [Online].
+A va ilable: https://www .pow erw orld.com/products/simulator/o ver view
+29. Orebaugh, A.D ., Biles, S ., Babbin, J .: Snort Cookbook. O’R eilly Media,
+Inc . (2005)
+30. Elasticsearch, Logstash, Kibana (ELK). https://www .elastic .co/what-is/
+elk-stack
+31. R odofile, N ., Radk e, K., F oo, E.: R eal‐time and interacti ve attacks on dnp3
+critical infrastr ucture using scapy . In: Proceedings of the 13th A ustralasian
+Infor mation Security Conference (AISC 2015), pp . 67–70 (2015)
+32. V an R ossum, G .: The Python Librar y R eference, R elease 3.8.2. Python
+Softw are F oundation (2020)
+33. Hawtho r ne, Mel: What is Mac Address Filtering? (2020). [Online].
+A va ilable: https://www .technipages .com/what-is-mac-address-filtering
+How to cite this ar ticle: Wlazlo, P ., et al.: Man‐in‐the‐
+middle attacks and defence in a pow er system cyber‐
+physic al testbed. IET Cyber‐Phys . Syst., Theor y Appl.
+6(3), 164–177 (2021). https://doi.org/10.1049/cps2.
+12014
+WLAZLO ET AL .
+-
+177
+ 23983396, 2021, 3, Downloaded from https://ietresearch.onlinelibrary.wiley.com/doi/10.1049/cps2.12014 by Nigeria Hinari NPL, Wiley Online Library on [21/10/2026]. See the Terms and Conditions (https://onlinelibrary.wiley.com/terms-and-conditions) on Wiley Online Library for rules of use; OA articles are governed by the applicable Creative Commons License

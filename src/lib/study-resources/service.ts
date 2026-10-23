@@ -2,7 +2,7 @@ import "server-only";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { generateStructuredResource } from "@/lib/ai/resource-generation";
-import { getUserLLMProvider } from "@/lib/ai/user-provider";
+import { getUserAIPreferences, getUserLLMProvider } from "@/lib/ai/user-provider";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import type { AIContextSource } from "@/lib/ai/types";
 import { courseBelongsToUser } from "@/lib/actions/course-ownership";
@@ -90,12 +90,24 @@ export async function generateStudyNotes(
     }
   }
 
+  const [llmProvider, aiPreferences] = await Promise.all([
+    deps.llmProvider ? Promise.resolve(deps.llmProvider) : getUserLLMProvider(userId),
+    getUserAIPreferences(userId),
+  ]);
+
   const generated = await generateStructuredResource(
     userId,
     { materialId, courseId, instruction: NOTES_GENERATION_REQUEST },
     StudyNotesModelOutputSchema,
     STUDY_NOTES_SCHEMA_NAME,
-    { llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId), roleInstructions: NOTES_ROLE_INSTRUCTIONS },
+    {
+      llmProvider,
+      roleInstructions: [
+        NOTES_ROLE_INSTRUCTIONS,
+        aiPreferences.responseLength === "concise" ? "User preference: keep these notes concise, focusing on the most important concepts." : null,
+        aiPreferences.responseLength === "detailed" ? "User preference: make these notes detailed enough for revision, with clear explanations and useful examples grounded in the material." : null,
+      ].filter(Boolean).join("\n\n"),
+    },
   );
 
   if (!generated.ok) {

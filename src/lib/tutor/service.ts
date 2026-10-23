@@ -1,6 +1,6 @@
 import "server-only";
 import { connectToDatabase } from "@/lib/db";
-import { getUserLLMProvider } from "@/lib/ai/user-provider";
+import { getUserAIPreferences, getUserLLMProvider } from "@/lib/ai/user-provider";
 import { askStructured } from "@/lib/ai/orchestrator";
 import type { LLMProvider } from "@/lib/ai/llm-provider";
 import type { AIContextSource } from "@/lib/ai/types";
@@ -112,6 +112,10 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
 
   const recentMessages = await listRecentMessages(userId, conversationId, CONVERSATION_POLICY.maxHistoryMessages);
   const conversationContext = boundConversationHistory(recentMessages);
+  const [llmProvider, aiPreferences] = await Promise.all([
+    deps.llmProvider ? Promise.resolve(deps.llmProvider) : getUserLLMProvider(userId),
+    getUserAIPreferences(userId),
+  ]);
 
   await TutorMessage.create({ conversationId: conversation._id, userId, role: "user", content: question });
 
@@ -129,9 +133,19 @@ export async function askTutor(userId: string, rawRequest: unknown, deps: TutorD
     TutorModelOutputSchema,
     TUTOR_SCHEMA_NAME,
     {
-      llmProvider: deps.llmProvider ?? await getUserLLMProvider(userId),
+      llmProvider,
       roleInstructions: [
         TUTOR_ROLE_INSTRUCTIONS,
+        aiPreferences.responseLength === "concise"
+          ? "Response preference: keep the explanation concise, prioritizing the essential answer and one useful example only when needed."
+          : aiPreferences.responseLength === "detailed"
+            ? "Response preference: provide a detailed, well-organized explanation with enough steps and examples to support understanding, while staying focused on the question."
+            : null,
+        aiPreferences.tutorTone === "direct"
+          ? "Tutor style preference: be direct, focused, and respectful. State the key point early and avoid unnecessary reassurance."
+          : aiPreferences.tutorTone === "socratic"
+            ? "Tutor style preference: guide learning with focused questions and hints before giving a full solution when appropriate. Do not withhold essential safety or factual information."
+            : "Tutor style preference: be encouraging and supportive while remaining clear and academically honest.",
         effectiveStudyMode === "practice"
           ? "Practice mode: use the selected study material when available. Ask one focused practice question at a time and do not reveal its answer until the student attempts it. After an attempt, explain what is correct or needs work, cite the supporting material when available, then ask the next question."
           : null,

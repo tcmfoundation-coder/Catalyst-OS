@@ -29,6 +29,8 @@ export default function MainTabs() {
         tabBarHideOnKeyboard: true,
       }}
     >
+      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="account" options={{ href: null }} />
       {tabs.map(({ name, title, glyph }) => (
         <Tabs.Screen
           key={name}

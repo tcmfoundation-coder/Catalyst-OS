@@ -4,10 +4,48 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserId } from "@/lib/dal";
 import { connectToDatabase } from "@/lib/db";
-import { getAvailableLLMProviders } from "@/lib/ai/provider-factory";
+import { getAvailableLLMProviders, getConfiguredLLMProviderName } from "@/lib/ai/provider-factory";
 import { UserAISettings } from "@/models/UserAISettings";
 
 const ProviderSchema = z.enum(["anthropic", "gemini", "openai"]);
+const PreferencesSchema = z.object({
+  voiceName: z.string().max(160),
+  voiceRate: z.number().min(0.75).max(1.25),
+  voicePitch: z.number().min(0.75).max(1.25),
+  autoSpeak: z.boolean(),
+  responseLength: z.enum(["concise", "balanced", "detailed"]),
+  tutorTone: z.enum(["supportive", "direct", "socratic"]),
+});
+
+export type AIPreferences = z.infer<typeof PreferencesSchema>;
+
+export async function getAIPreferencesAction(): Promise<AIPreferences> {
+  const userId = await requireUserId();
+  await connectToDatabase();
+  const settings = await UserAISettings.findOne({ userId }).select("voiceName voiceRate voicePitch autoSpeak responseLength tutorTone").lean();
+  return {
+    voiceName: settings?.voiceName ?? "",
+    voiceRate: settings?.voiceRate ?? 1,
+    voicePitch: settings?.voicePitch ?? 1,
+    autoSpeak: settings?.autoSpeak ?? false,
+    responseLength: settings?.responseLength ?? "balanced",
+    tutorTone: settings?.tutorTone ?? "supportive",
+  };
+}
+
+export async function saveAIPreferencesAction(value: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await requireUserId();
+  const parsed = PreferencesSchema.safeParse(value);
+  if (!parsed.success) return { ok: false, error: "One or more AI preferences are invalid." };
+  await connectToDatabase();
+  await UserAISettings.findOneAndUpdate(
+    { userId },
+    { $set: parsed.data, $setOnInsert: { userId, provider: getConfiguredLLMProviderName() } },
+    { upsert: true, runValidators: true, setDefaultsOnInsert: true },
+  );
+  revalidatePath("/dashboard/settings/ai");
+  return { ok: true };
+}
 
 export async function setAIProviderAction(value: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
   const userId = await requireUserId();
@@ -32,7 +70,11 @@ export async function setAIProviderAction(value: unknown): Promise<{ ok: true } 
 export async function resetAIProviderAction(): Promise<void> {
   const userId = await requireUserId();
   await connectToDatabase();
-  await UserAISettings.deleteOne({ userId });
+  await UserAISettings.findOneAndUpdate(
+    { userId },
+    { $set: { provider: getConfiguredLLMProviderName() }, $setOnInsert: { userId } },
+    { upsert: true, runValidators: true, setDefaultsOnInsert: true },
+  );
   revalidatePath("/dashboard/settings/ai");
 }
 

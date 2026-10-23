@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { askTutorAction } from "@/lib/actions/tutor";
+import { getAIPreferencesAction, type AIPreferences } from "@/lib/actions/ai-settings";
 import type { ConversationMessageView } from "@/lib/tutor/conversations";
 import type { TutorResult } from "@/lib/tutor/types";
 
@@ -48,12 +49,42 @@ export function AIHub() {
   const [messages, setMessages] = useState<ConversationMessageView[]>([]);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [voicePreferences, setVoicePreferences] = useState<AIPreferences>({
+    voiceName: "", voiceRate: 1, voicePitch: 1, autoSpeak: false,
+    responseLength: "balanced", tutorTone: "supportive",
+  });
   const launcherRef = useRef<HTMLButtonElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const requestInFlightRef = useRef(false);
 
   const localMessageId = () => `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  useEffect(() => {
+    let active = true;
+    void getAIPreferencesAction().then((preferences) => {
+      if (active) setVoicePreferences(preferences);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => () => {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }, []);
+
+  const speak = (text: string) => {
+    if (!("speechSynthesis" in window)) {
+      setError("Speech playback is not supported by this browser. You can still read the reply here.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = voicePreferences.voiceRate;
+    utterance.pitch = voicePreferences.voicePitch;
+    const selectedVoice = window.speechSynthesis.getVoices().find((voice) => voice.voiceURI === voicePreferences.voiceName);
+    if (selectedVoice) utterance.voice = selectedVoice;
+    window.speechSynthesis.speak(utterance);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -123,6 +154,7 @@ export function AIHub() {
 
       if (!result.ok) {
         setError(result.error);
+        if (voicePreferences.autoSpeak) speak(result.error);
         setInput((current) => current || question);
         return;
       }
@@ -138,8 +170,11 @@ export function AIHub() {
           createdAt: new Date().toISOString(),
         },
       ]);
+      if (voicePreferences.autoSpeak) speak(result.answer);
     } catch {
-      setError("Sorry, something went wrong generating a response. Please try again.");
+      const message = "Sorry, something went wrong generating a response. Please try again.";
+      setError(message);
+      if (voicePreferences.autoSpeak) speak(message);
       setInput((current) => current || question);
     } finally {
       requestInFlightRef.current = false;
@@ -197,7 +232,7 @@ export function AIHub() {
                 </h2>
                 <p className="flex items-center gap-1.5 text-[10px] tracking-wide text-muted">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#99a884]" aria-hidden="true" />
-                  TEXT CHAT · VOICE UNAVAILABLE
+                  AI VOICE OUTPUT
                 </p>
               </div>
             </div>
@@ -250,6 +285,11 @@ export function AIHub() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
+                  {message.role === "assistant" && (
+                    <button type="button" onClick={() => speak(message.content)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[#b7c5a8]/15 px-2 text-[10px] text-muted hover:text-foreground" aria-label="Speak this reply">
+                      <span aria-hidden="true">◖))</span> Speak
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -190,7 +190,7 @@ async function syncReminderNotifications(settings: AppSettings["notifications"])
         content: {
           title: reminder.title,
           body: reminder.body,
-          data: { [REMINDER_DATA_KEY]: reminder.id },
+          data: { [REMINDER_DATA_KEY]: reminder.id, url: "/command" },
           ...(Platform.OS === "android" ? { channelId: "catalysts-reminders" } : {}),
         },
         trigger: {
